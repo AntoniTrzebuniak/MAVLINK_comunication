@@ -1,0 +1,1 @@
+KERNEL=="ttyAMA2", RUN+="/bin/stty -F /dev/ttyAMA2 raw -echo -echoe -echok -echoctl -echoke"

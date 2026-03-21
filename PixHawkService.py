@@ -3,7 +3,7 @@ import time
 from typing import Tuple, List, Dict, Optional
 import numpy as np
 #from pyproj import Transformer, CRS
-import cv2
+#import cv2
 from math import radians
 
 
@@ -42,7 +42,7 @@ class PixHawkService:
         drone.close()
     """
 
-    def __init__(self, device: str = "/dev/ttyAMA0", baud: int = 57600):
+    def __init__(self, device: str = "/dev/ttyAMA2", baud: int = 115200):
         """
         Connects to Pixhawk via MAVLink.
 
@@ -52,6 +52,8 @@ class PixHawkService:
 
         try:
             self.master = mavutil.mavlink_connection(device, baud=baud)
+            print(f"Connecting to {device} at {baud} baud...")
+            print("Waiting for heartbeat...")
             self.master.wait_heartbeat()
             print(f"Connected to system {self.master.target_system}, component {self.master.target_component}")
         except Exception as e:
@@ -665,7 +667,7 @@ def rot_matrix(roll, pitch, yaw):
         return Rz @ Ry @ Rx
 
 
-
+'''
 if __name__ == "__main__":
 
     lat_uav, lon_uav = 40.736313, 30.073209        # [deg]
@@ -735,3 +737,4 @@ if __name__ == "__main__":
 
         print( lat_t, lon_t)
         #ISin = isinrect(lat_t, lon_t)
+'''
