@@ -1,4 +1,5 @@
-from Antek import PixHawkService
+from __future__ import annotations
+from Application.Services.MatekService import MatekService
 import numpy as np
 from pymavlink import mavutil, mavextra
 from typing import Tuple, List, Dict, Optional
@@ -7,10 +8,11 @@ import cv2
 class MissionService:
     """
     Args:
-        drone: PixHawkService object instance
+        drone: MatekService object instance
         resolution: (width, height)
     """
-    def __init__(self, drone: PixHawkService, resolution: tuple):
+    def __init__(self, drone: MatekService, resolution: tuple):
+        self.logger = get_logger(__name__)
         self.image_width, self.image_height = resolution
         self.GEOFENCE = [
             (40.7352710, 30.0884038),

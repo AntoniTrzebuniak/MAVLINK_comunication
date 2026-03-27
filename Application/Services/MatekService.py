@@ -1,18 +1,21 @@
+from __future__ import annotations
 from pymavlink import mavutil, mavextra
 import time
-from typing import Tuple, List, Dict, Optional
+from typing import Any, Tuple, List, Dict, Optional
 import numpy as np
 #from pyproj import Transformer, CRS
 #import cv2
 from math import radians
 
+from Application.configuration.config_loader import cfg     # Mandatory
+from Application.Logger.log_module import get_logger
 
 
-class PixHawkService:
+class MatekService:
     """
     Example usage:
     # Initialize connection\n
-    drone = PixHawkService()
+    drone = MatekService()
 
     waypoints = [
         {"lat": -35.363261, "lon": 149.165230, "alt": 20},
@@ -42,25 +45,27 @@ class PixHawkService:
         drone.close()
     """
 
-    def __init__(self, device: str = "/dev/ttyAMA2", baud: int = 115200):
+    def __init__(self, device: str = cfg.mav.device, baud: int = cfg.mav.baud):
         """
-        Connects to Pixhawk via MAVLink.
+        Connects to Matek via MAVLink.
 
-        :param device: string to device (eg. '/dev/ttyAMA0')
-        :param baud: baud rate (default 57600)
+        :param cfg: optional Config object loaded from config.toml
+        :param device: device path e.g. '/dev/ttyAMA0' (overrides cfg)
+        :param baud: baud rate (overrides cfg)
         """
+        self.logger = get_logger(__name__)
+        self.device = device
+        self.baud = baud
 
         try:
-            self.master = mavutil.mavlink_connection(device, baud=baud)
-            print(f"Connecting to {device} at {baud} baud...")
-            print("Waiting for heartbeat...")
+            self.master = mavutil.mavlink_connection(self.device, baud=self.baud)
             self.master.wait_heartbeat()
-            print(f"Connected to system {self.master.target_system}, component {self.master.target_component}")
+            self.logger.info("Connected to system %s component %s", self.master.target_system, self.master.target_component)
         except Exception as e:
-            print(f"Connection failed: {e}")
+            self.logger.exception("Connection failed: %s", e)
             raise
 
-    def get_current_coordinates(self, timeout=1) -> Optional[Tuple[float, float, float]]:
+    def get_current_coordinates(self, timeout=2) -> Optional[Tuple[float, float, float]]:
         """
         Reads current GPS position (lat, lon, alt).
 
@@ -98,11 +103,12 @@ class PixHawkService:
                     return mode_name
         return "UNKNOWN"
 
-    def get_mission(self) -> List[Dict[str, float]]:
+    def get_mission(self) -> List[Dict[str, Any]]:
         """
-        Downloads mission as list of dicts with lat/lon/alt.
+        Downloads mission as list of raw MAVLink mission items.
 
-        :return: List of dicts with seq/lat/lon/alt/command
+        :return: List of dicts with seq, command, frame, current,
+        autocontinue, param1..param7
         """
         mission = []
         self.master.mav.mission_request_list_send(self.master.target_system, self.master.target_component)
@@ -112,109 +118,192 @@ class PixHawkService:
             return mission
 
         count = msg.count
-        print(f"Mission has {count} waypoints")
+        print(f"Mission has {count} items")
 
         for i in range(count):
-            self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
+            #self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
+            #item = self.master.recv_match(type='MISSION_ITEM_INT', blocking=True, timeout=5)
+
+            self.master.mav.mission_request_int_send(self.master.target_system, self.master.target_component, i, 0)
             item = self.master.recv_match(type='MISSION_ITEM_INT', blocking=True, timeout=5)
             if item:
                 mission.append({
                     "seq": item.seq,
-                    "lat": item.x,
-                    "lon": item.y,
-                    "alt": item.z,
-                    "command": item.command
+                    "command": item.command,
+                    "frame": item.frame,
+                    "current": item.current,
+                    "autocontinue": item.autocontinue,
+
+                    "param1": item.param1,
+                    "param2": item.param2,
+                    "param3": item.param3,
+                    "param4": item.param4,
+                    "param5": item.x,
+                    "param6": item.y,
+                    "param7": item.z,
                 })
+
+
+                print(f"""
+                --- MISSION ITEM {item.seq} ---
+                command: {item.command}
+                frame: {item.frame}
+                current: {item.current}
+                autocontinue: {item.autocontinue}
+
+                param1: {item.param1}
+                param2: {item.param2}
+                param3: {item.param3}
+                param4: {item.param4}
+                param5(x): {item.x}
+                param6(y): {item.y}
+                param7(z): {item.z}
+                ----------------------------
+                """)
+
         return mission
+
+    def set_waypoints(self, waypoints: list[dict[str, Any]]) -> bool:           
+
+	    # komentarz : ogólnie to funkcja działa, ale pierwszy punkt jest ignorowany z jakiegoś powodu!!
+		# ardupilot pierwszy punkt traktuje jako Home, dodałem implementację w której automatycznie punkt
+		# zerowy zostaje dodany, nie bierze on udziału w misji
+
+        
+        home = {"command": 16, "frame": 0, "current": 1, "autocontinue": 1,
+            "param1": 0, "param2": 0, "param3": 0, "param4": 0,
+            "param5": 0, "param6": 0, "param7": 0}
+
+        
+        command_map = {"WAYPOINT": 16, "SET_SERVO": 183}
+
+        all_waypoints = [home] + waypoints
     
-
-    def set_waypoints(self, waypoints: list[dict[str, float]]) -> bool:
-
         self.master.mav.mission_count_send(
             self.master.target_system,
             self.master.target_component,
-            len(waypoints)
+            len(all_waypoints),
+            0
         )
 
-        for i, wp in enumerate(waypoints):
+        for i, wp in enumerate(all_waypoints):
             # Czekamy na żądanie przesłania waypointa
-            req = self.master.recv_match(type='MISSION_REQUEST', blocking=True, timeout=5)
+            req = self.master.recv_match(type=['MISSION_REQUEST', 'MISSION_REQUEST_INT'], blocking=True, timeout=5)
             if not req:
                 print(f"No mission request received for waypoint {i}")
                 return False
-
-            if wp["command"] == "WAYPOINT":
-                self.master.mav.mission_item_send(
-                    self.master.target_system,
-                    self.master.target_component,
-                    i,  # sequence number
-                    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                    mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                    1 if i == 0 else 0,  # current
-                    1,  # autocontinue
-                    0,
-                    wp["acr"],
-                    0, 0,
-                    wp["lat"],
-                    wp["lon"],
-                    wp["alt"]
-                )
-
-            elif wp["command"] == "SET_SERVO":
-                self.master.mav.mission_item_send(
+            
+            print(f"Got request type: {req.get_type()}, seq: {req.seq}")
+            # Obsługa dwóch typów danych wejściowych : 
+            # jeśli param5 istnieje, dane pochodzą z mateka
+            if "param5" in wp:
+                cmd = wp["command"]
+                self.master.mav.mission_item_int_send(
                     self.master.target_system,
                     self.master.target_component,
                     i,
-                    mavutil.mavlink.MAV_FRAME_MISSION,  # frame for DO commands
-                    mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
-                    0,  # current = 0 (nie ustawia aktualnej pozycji)
-                    1,  # autocontinue
-                    wp["channel"],   # param1 = channel
-                    wp["pwm"],       # param2 = PWM
-                    0, 0, 0,         # param3-5 (unused)
-                    0, 0, 0          # x, y, z not used for this command
-                )
-
+                    wp["frame"],
+                    cmd,
+                    wp["current"],
+                    wp["autocontinue"],
+                    wp["param1"],
+                    wp["param2"],
+                    wp["param3"],
+                    wp["param4"],
+                    int(wp["param5"]),
+                    int(wp["param6"]),
+                    wp["param7"]
+            )
+            # jeśli param5 nie istnieje, dane pochodzą z kodu i należy je przetłumaczyć na format MAVLink
             else:
-                print(f"Unknown command in waypoint {i}: {wp['command']}")
-                return False
+                cmd = command_map.get(wp["command"], wp["command"])
 
-    def append_waypoints(self, new_wps: List[Dict[str, float]]) -> bool:
+                if cmd == 16:  # WAYPOINT
+                    self.master.mav.mission_item_int_send(
+                        self.master.target_system,
+                        self.master.target_component,
+                        i,
+                        mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                        1 if i == 0 else 0,
+                        1,
+                        0,
+                        wp["acr"],
+                        0, 0,
+                        int(wp["lat"] * 1e7),
+                        int(wp["lon"] * 1e7),
+                        wp["alt"]
+                    )
+                elif cmd == 183:  # SET_SERVO
+                    self.master.mav.mission_item_int_send(
+                        self.master.target_system,
+                        self.master.target_component,
+                        i,
+                        mavutil.mavlink.MAV_FRAME_MISSION,
+                        mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
+                        0, 1,
+                        wp["channel"],  # param1 = channel
+                        wp["pwm"],       # param2 = PWM
+                        0, 0, 0, 0, 0    # param3-7 (unused)
+                    )
+                # jeśli planujemy ręcznie dodawać inne typy komend do misji, należy je zdefiniować tutaj ręcznie
+            
+
+                else:
+                    print(f"Unknown command in waypoint {i}: {wp['command']}")
+                    return False
+        ack = self.master.recv_match(type='MISSION_ACK', blocking=True, timeout=5)
+        if ack:
+            print(f"Mission ACK: {ack.type}")
+
+        return True
+             
+    def append_waypoints(self, new_wps: List[Dict[str, Any]]) -> bool:
         """
         Appends new waypoints to existing mission.
 
-        :param new_wps: List of waypoint dicts to append in format {"lat": deg, "lon": deg, "alt": meters}
+        :param new_wps: List of waypoint dicts to append
         :return: True if mission was updated successfully, False otherwise
         """
         mission = self.get_mission()
+
+        # pomijamy punkt zerowy
+        if mission:
+            mission = mission[1:]
         mission.extend(new_wps)
         print(f"Appending {len(new_wps)} waypoints (new total {len(mission)})")
         return self.set_waypoints(mission)
 
-    def prepend_waypoint(self, new_wp: Dict[str, float]) -> bool:
+    def prepend_waypoints(self, new_wps: List[Dict[str, Any]]) -> bool:
         """
-        Prepends a waypoint at the beginning of mission.
+        Prepends waypoints at the beginning of mission.
 
-        :param new_wp: Waypoint dict to prepend
+        :param new_wps: List of waypoint dicts to prepend
         :return: True if mission was updated successfully, False otherwise
         """
         mission = self.get_mission()
-        mission.insert(0, new_wp)
-        print(f"Prepended waypoint, new total {len(mission)}")
+        # pomijamy punkt zerowy
+        if mission:
+            mission = mission[1:]
+        mission = new_wps + mission
+        print(f"Prepended {len(new_wps)} waypoints, new total {len(mission)}")
         return self.set_waypoints(mission)
 
     def set_current_waypoint(self, index: int) -> bool:
         """
-        Sets current waypoint index (0-based).
-
-        :param index: Waypoint index to set as current
-        :return: True if waypoint was set successfully, False otherwise
+        Sets current waypoint index (0-based)
         """
-        self.master.mav.mission_set_current_send(self.master.target_system, self.master.target_component, index)
+        real_index = index + 1  # przesunięcie przez index home w funkcji set_waypoints
 
+        self.master.mav.mission_set_current_send(
+            self.master.target_system,
+            self.master.target_component,
+            real_index
+        )
         # Wait for acknowledgment
         ack = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=5)
-        if ack and ack.seq == index:
+
+        if ack and ack.seq == real_index:
             print(f"Successfully set current waypoint to index {index}")
             return True
         else:
@@ -320,6 +409,10 @@ class PixHawkService:
             print(f"Mode change failed. Current mode: {current_mode}")
             return False
 
+
+
+
+# dotąd sprawdzałem czy działa i naprawiałem
     def check_prearm_status(self) -> bool:
         """
         Checks GPS, EKF, and system status before arming.
@@ -425,7 +518,6 @@ class PixHawkService:
 
         print(f"Mission started successfully from waypoint {start_index}")
         return True
-
 
     def emergency_stop(self) -> None:
         """
@@ -551,20 +643,39 @@ class PixHawkService:
     
     def add_drop_waypoint(self, new_waypoint):
         print("START")
-        mission = self.sandbox()
+        mission = self.get_mission()
+
+        if mission:
+            mission = mission[1:] 
+
         best_idx = -1
         best_distance = 10**100
-        print(len(mission))
-        new_mission = [{"lat":i["lat"],"lon":i["lon"],"alt":i["alt"]} for i in mission]
-        for i in range(1,len(mission)+1):
-            i = i%len(mission)
-            future_waypoint = mission[i]
-            prev_waypoint = mission[i-1]
+
+        nav_mission = []
+
+        for idx, item in enumerate(mission):
+            if item["command"] == 16:
+                nav_mission.append({
+                    "lat": item["param5"] / 1e7,
+                    "lon": item["param6"] / 1e7,
+                    "alt": item["param7"],
+                    "idx": idx
+                })
+
+        if not nav_mission:
+            return [new_waypoint]
+
+        for i in range(1, len(nav_mission) + 1):
+            i = i % len(nav_mission)
+            future_waypoint = nav_mission[i]
+            prev_waypoint = nav_mission[i - 1]
+
             new_lat = new_waypoint["lat"]
             new_lon = new_waypoint["lon"]
             prev_lat = prev_waypoint["lat"]
             prev_lon = prev_waypoint["lon"]
-            distance = (new_lat - prev_lat)**2 + (new_lon - prev_lon)**2
+
+            distance = (new_lat - prev_lat) ** 2 + (new_lon - prev_lon) ** 2
 
             print(f"previous wp: {prev_waypoint}\nfuture wp: {future_waypoint}\ndistance = {distance}")
             print("\n\n\n")
@@ -572,13 +683,14 @@ class PixHawkService:
             if distance < best_distance:
                 best_distance = distance
                 best_idx = i
+
         if best_idx == 0:
-            mission = mission[:] + [new_waypoint]
-            new_mission.append(new_waypoint)    
+            mission = mission + [new_waypoint]
         else:
-            mission = mission[:best_idx] + [new_waypoint] + mission[best_idx:]
-            new_mission.insert(best_idx,new_waypoint)
-        return new_mission
+            real_idx = nav_mission[best_idx]["idx"]
+            mission = mission[:real_idx] + [new_waypoint] + mission[real_idx:]
+
+        return self.set_waypoints(mission)
     
     def get_attitude(self, timeout=1):
         msg_att = self.master.recv_match(type='ATTITUDE', blocking=True, timeout=timeout)
@@ -625,9 +737,9 @@ class PixHawkService:
 
 
 
-
+'''
 if __name__ == "_main__":      # zamierzone użycie klasy
-    drone = PixHawkService()
+    drone = MatekService()
     mission = MissionService(drone)
     #TODO getPixel która zdobędzie piksel od image_processing
     # pytanie kiedy zdjęcie było zrobione bo jak img processing ~0.5s to snapshot parametrów opóźniony
@@ -667,7 +779,7 @@ def rot_matrix(roll, pitch, yaw):
         return Rz @ Ry @ Rx
 
 
-'''
+
 if __name__ == "__main__":
 
     lat_uav, lon_uav = 40.736313, 30.073209        # [deg]

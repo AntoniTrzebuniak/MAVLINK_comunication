@@ -1,0 +1,37 @@
+[mavlink]
+device = "/dev/ttyAMA2"
+baud = 115200
+mav_version = 2
+
+[drops]
+cruise_speed = 20    # m/s
+wind_speed = 0       # m/s
+wind_direction = 0   # azimuth in degrees
+
+[drops.beacon]
+mass = 155           # grams
+cd = 0.27            # współczynnik oporu
+drop_course = 0      # azimuth in degrees
+
+[drops.bottle]
+mass = 255           # grams
+cd = 0.3
+drop_course = 0
+
+[camera]
+resolution = [1920, 1080]
+# TBA
+# K matrix
+# Distortion
+
+[dirs]
+logs_dir = "logs"
+
+[system]
+debug_mode = false
+
+
+#TBA
+#[zones]
+#search_zone
+#map_zone

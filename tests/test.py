@@ -36,3 +36,7 @@ def calc_drop_waypoints(target: tuple, yaw: float):
         return waypoints
 
 print(calc_drop_waypoints((40.73641380938534, 30.07330877131571), 0))
+
+
+
+
