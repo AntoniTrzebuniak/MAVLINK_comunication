@@ -29,6 +29,8 @@ if [ -f "$SCRIPT_DIR/manual_packages.txt" ]; then
     # Dodano pakiety python3-venv i python3-pip niezbędne do utworzenia środowiska wirtualnego
     apt-get install -y $PACKAGES python3-venv python3-pip
     echo "Pakiety zainstalowane."
+    sudo apt-get remove modemmanager -y
+    echo "Odinstalowano modemanager"
 else
     echo "Błąd: Brak pliku manual_packages.txt"
 fi

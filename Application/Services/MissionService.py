@@ -245,5 +245,3 @@ if __name__ == "__main__":
     mission.prepare_wps(ll, pp)
     for i in mission.NEW_MISSION:
         print(i)
-
-

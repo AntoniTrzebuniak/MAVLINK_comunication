@@ -73,7 +73,7 @@ class MatekService:
         """
         msg = self.master.recv_match(type='GLOBAL_POSITION_INT', blocking=True, timeout=timeout)
         if not msg:
-            print("No GPS data received.")
+            self.logger.warning("No GPS data received.")
             return None
         return msg.lat / 1e7, msg.lon / 1e7, msg.alt / 1000.0
 
@@ -114,11 +114,11 @@ class MatekService:
         self.master.mav.mission_request_list_send(self.master.target_system, self.master.target_component)
         msg = self.master.recv_match(type='MISSION_COUNT', blocking=True, timeout=5)
         if not msg:
-            print("No mission count received")
+            self.logger.warning("No mission count received")
             return mission
 
         count = msg.count
-        print(f"Mission has {count} items")
+        self.logger.info(f"Mission has {count} items")
 
         for i in range(count):
             #self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
@@ -144,7 +144,7 @@ class MatekService:
                 })
 
 
-                print(f"""
+                self.logger.info(f"""
                 --- MISSION ITEM {item.seq} ---
                 command: {item.command}
                 frame: {item.frame}
@@ -190,10 +190,10 @@ class MatekService:
             # Czekamy na żądanie przesłania waypointa
             req = self.master.recv_match(type=['MISSION_REQUEST', 'MISSION_REQUEST_INT'], blocking=True, timeout=5)
             if not req:
-                print(f"No mission request received for waypoint {i}")
+                self.logger.warning(f"No mission request received for waypoint {i}")
                 return False
-            
-            print(f"Got request type: {req.get_type()}, seq: {req.seq}")
+
+            self.logger.info(f"Got request type: {req.get_type()}, seq: {req.seq}")
             # Obsługa dwóch typów danych wejściowych : 
             # jeśli param5 istnieje, dane pochodzą z mateka
             if "param5" in wp:
@@ -250,11 +250,11 @@ class MatekService:
             
 
                 else:
-                    print(f"Unknown command in waypoint {i}: {wp['command']}")
+                    self.logger.error(f"Unknown command in waypoint {i}: {wp['command']}")
                     return False
         ack = self.master.recv_match(type='MISSION_ACK', blocking=True, timeout=5)
         if ack:
-            print(f"Mission ACK: {ack.type}")
+            self.logger.info(f"Mission ACK: {ack.type}")
 
         return True
              
@@ -271,7 +271,7 @@ class MatekService:
         if mission:
             mission = mission[1:]
         mission.extend(new_wps)
-        print(f"Appending {len(new_wps)} waypoints (new total {len(mission)})")
+        self.logger.info(f"Appending {len(new_wps)} waypoints (new total {len(mission)})")
         return self.set_waypoints(mission)
 
     def prepend_waypoints(self, new_wps: List[Dict[str, Any]]) -> bool:
@@ -286,7 +286,7 @@ class MatekService:
         if mission:
             mission = mission[1:]
         mission = new_wps + mission
-        print(f"Prepended {len(new_wps)} waypoints, new total {len(mission)}")
+        self.logger.info(f"Prepended {len(new_wps)} waypoints, new total {len(mission)}")
         return self.set_waypoints(mission)
 
     def set_current_waypoint(self, index: int) -> bool:
@@ -304,10 +304,10 @@ class MatekService:
         ack = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=5)
 
         if ack and ack.seq == real_index:
-            print(f"Successfully set current waypoint to index {index}")
+            self.logger.info(f"Successfully set current waypoint to index {index}")
             return True
         else:
-            print(f"Failed to set current waypoint to index {index}")
+            self.logger.error(f"Failed to set current waypoint to index {index}")
             return False
 
     def arm(self) -> bool:
@@ -317,7 +317,7 @@ class MatekService:
         :return: True if drone is armed successfully, False otherwise
         """
         if self.is_armed():
-            print("Drone already armed")
+            self.logger.info("Drone already armed")
             return True
 
         self.master.mav.command_long_send(
@@ -332,17 +332,17 @@ class MatekService:
         # Wait for acknowledgment
         ack = self.master.recv_match(type='COMMAND_ACK', blocking=True, timeout=5)
         if ack and ack.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
-            print("Arm command accepted")
+            self.logger.debug("Arm command accepted")
             # Wait a moment and check if actually armed
             time.sleep(1)
             if self.is_armed():
-                print("Drone successfully armed")
+                self.logger.info("Drone successfully armed")
                 return True
             else:
-                print("Arm command sent but drone not armed")
+                self.logger.warning("Arm command sent but drone not armed")
                 return False
         else:
-            print(f"Arm command failed: {ack.result if ack else 'timeout'}")
+            self.logger.error(f"Arm command failed: {ack.result if ack else 'timeout'}")
             return False
 
     def disarm(self) -> bool:
@@ -352,7 +352,7 @@ class MatekService:
         :return: True if drone is disarmed successfully, False otherwise
         """
         if not self.is_armed():
-            print("Drone already disarmed")
+            self.logger.info("Drone already disarmed")
             return True
 
         self.master.mav.command_long_send(
@@ -370,13 +370,13 @@ class MatekService:
             print("Disarm command accepted")
             time.sleep(1)
             if not self.is_armed():
-                print("Drone successfully disarmed")
+                self.logger.info("Drone successfully disarmed")
                 return True
             else:
-                print("Disarm command sent but drone still armed")
+                self.logger.warning("Disarm command sent but drone still armed")
                 return False
         else:
-            print(f"Disarm command failed: {ack.result if ack else 'timeout'}")
+            self.logger.error(f"Disarm command failed: {ack.result if ack else 'timeout'}")
             return False
 
     def set_mode(self, mode_name: str) -> bool:
@@ -388,9 +388,9 @@ class MatekService:
         """
         mode_id = self.master.mode_mapping().get(mode_name)
         if mode_id is None:
-            print(f"Unknown mode: {mode_name}")
+            self.logger.error(f"Unknown mode: {mode_name}")
             available_modes = list(self.master.mode_mapping().keys())
-            print(f"Available modes: {available_modes}")
+            self.logger.info(f"Available modes: {available_modes}")
             return False
 
         self.master.mav.set_mode_send(
@@ -403,10 +403,10 @@ class MatekService:
         time.sleep(0.5)
         current_mode = self.get_current_mode()
         if current_mode == mode_name:
-            print(f"Successfully set mode to {mode_name}")
+            self.logger.info(f"Successfully set mode to {mode_name}")
             return True
         else:
-            print(f"Mode change failed. Current mode: {current_mode}")
+            self.logger.warning(f"Mode change failed. Current mode: {current_mode}")
             return False
 
 
@@ -424,10 +424,10 @@ class MatekService:
         # GPS check
         gps = self.master.recv_match(type='GPS_RAW_INT', blocking=True, timeout=5)
         if not gps or gps.fix_type < 3:
-            print("GPS not ready (need 3D fix)")
+            self.logger.warning("GPS not ready (need 3D fix)")
             checks_passed = False
         else:
-            print(f"GPS ready (fix type: {gps.fix_type}, satellites: {gps.satellites_visible})")
+            self.logger.info(f"GPS ready (fix type: {gps.fix_type}, satellites: {gps.satellites_visible})")
 
         # System status
         sys_status = self.master.recv_match(type='SYS_STATUS', blocking=True, timeout=5)
@@ -435,45 +435,45 @@ class MatekService:
             # Check individual sensor health bits
             sensors = sys_status.onboard_control_sensors_health
             if sensors & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO:
-                print("Gyroscope healthy")
+                self.logger.info("Gyroscope healthy")
             else:
-                print("Gyroscope not healthy")
+                self.logger.warning("Gyroscope not healthy")
                 checks_passed = False
 
             if sensors & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL:
-                print("Accelerometer healthy")
+                self.logger.info("Accelerometer healthy")
             else:
-                print("Accelerometer not healthy")
+                self.logger.warning("Accelerometer not healthy")
                 checks_passed = False
         else:
-            print("No system status received")
+            self.logger.error("No system status received")
             checks_passed = False
 
         # EKF check (if available)
         ekf = self.master.recv_match(type='EKF_STATUS_REPORT', blocking=True, timeout=2)
         if ekf:
             if ekf.flags & 0x01:  # EKF solution OK bit
-                print("EKF stable")
+                self.logger.info("EKF stable")
             else:
-                print("EKF not stable")
+                self.logger.warning("EKF not stable")
                 checks_passed = False
         else:
-            print("EKF status not available (may be normal)")
+            self.logger.info("EKF status not available (may be normal)")
 
         # Battery check
         battery = self.master.recv_match(type='SYS_STATUS', blocking=True, timeout=2)
         if battery and hasattr(battery, 'voltage_battery'):
             voltage = battery.voltage_battery / 1000.0  # Convert from mV to V
             if voltage > 10.5:  # Minimum safe voltage for most setups
-                print(f"Battery voltage OK: {voltage:.1f}V")
+                self.logger.info(f"Battery voltage OK: {voltage:.1f}V")
             else:
-                print(f"Battery voltage low: {voltage:.1f}V")
+                self.logger.warning(f"Battery voltage low: {voltage:.1f}V")
                 checks_passed = False
 
         if checks_passed:
-            print("All pre-arm checks passed")
+            self.logger.info("All pre-arm checks passed")
         else:
-            print("Some pre-arm checks failed")
+            self.logger.warning("Some pre-arm checks failed")
 
         return checks_passed
 
@@ -485,38 +485,38 @@ class MatekService:
         :param start_index: Waypoint index to start from (0-based)
         :return: True if mission started successfully, False otherwise
         """
-        print("Starting mission sequence...")
+        self.logger.info("Starting mission sequence...")
 
         if not self.check_prearm_status():
-            print("Pre-arm checks failed - mission not started")
+            self.logger.warning("Pre-arm checks failed - mission not started")
             return False
 
         # Check if mission exists
         mission = self.get_mission()
         if not mission:
-            print("No mission loaded")
+            self.logger.error("No mission loaded")
             return False
 
         if start_index >= len(mission):
-            print(f"Start index {start_index} exceeds mission length {len(mission)}")
+            self.logger.error(f"Start index {start_index} exceeds mission length {len(mission)}")
             return False
 
         # Arm the drone
         if not self.arm():
-            print("Failed to arm drone")
+            self.logger.error("Failed to arm drone")
             return False
 
         # Set AUTO mode
         if not self.set_mode("AUTO"):
-            print("Failed to set AUTO mode")
+            self.logger.error("Failed to set AUTO mode")
             return False
 
         # Set starting waypoint
         if not self.set_current_waypoint(start_index):
-            print(f"Failed to set starting waypoint {start_index}")
+            self.logger.error(f"Failed to set starting waypoint {start_index}")
             return False
 
-        print(f"Mission started successfully from waypoint {start_index}")
+        self.logger.info(f"Mission started successfully from waypoint {start_index}")
         return True
 
     def emergency_stop(self) -> None:
@@ -525,7 +525,7 @@ class MatekService:
 
         Forces immediate disarm without waiting for acknowledgment.
         """
-        print("EMERGENCY STOP - Disarming drone")
+        self.logger.info("EMERGENCY STOP - Disarming drone")
         self.master.mav.command_long_send(
             self.master.target_system,
             self.master.target_component,
@@ -580,8 +580,8 @@ class MatekService:
         armed = self.is_armed()
 
         if coords and status:
-            print(f"Position: {coords[0]:.6f}, {coords[1]:.6f}, Alt: {coords[2]:.1f}m")
-            print(
+            self.logger.info(f"Position: {coords[0]:.6f}, {coords[1]:.6f}, Alt: {coords[2]:.1f}m")
+            self.logger.info(
                 f"Mission: {status['current_waypoint']}/{status['total_waypoints'] - 1} | Mode: {mode} | Armed: {armed}")
 
         return {
@@ -695,6 +695,7 @@ class MatekService:
     def get_attitude(self, timeout=1):
         msg_att = self.master.recv_match(type='ATTITUDE', blocking=True, timeout=timeout)
         if msg_att is None:
+            self.logger.warning("No attitude data received")
             return None
         roll  = msg_att.roll    # rad +prawo -lewo
         pitch = msg_att.pitch   # rad +góra  -dół
@@ -710,7 +711,7 @@ class MatekService:
         :param pwm: PWM value in microseconds (typically 1000–2000)
         :return: True if command was acknowledged, False otherwise
         """
-        print(f"Setting servo channel {channel} to {pwm}µs")
+        self.logger.info(f"Setting servo channel {channel} to {pwm}µs")
 
         # Send command
         self.master.mav.command_long_send(
@@ -725,6 +726,7 @@ class MatekService:
 
         # Wait for ACK
         return self.wait_for_command_ack(mavutil.mavlink.MAV_CMD_DO_SET_SERVO, timeout=3)
+        
     def close(self) -> None:
         """
         Closes the MAVLink connection.
@@ -733,7 +735,7 @@ class MatekService:
         """
         if hasattr(self, 'master'):
             self.master.close()
-            print("MAVLink connection closed")
+            self.logger.info("MAVLink connection closed")
 
 
 

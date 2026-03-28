@@ -2,7 +2,6 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-
 @dataclass(frozen=True)
 class MAVLinkConfig:
     device: str
@@ -29,70 +28,87 @@ class CameraConfig:
 
 @dataclass(frozen=True)
 class DirsConfig:
-    base_dir: Path
+    root_dir: Path
     logs_dir: Path
-
+    config_dir: Path
+    videos_dir: Path
+    photos_dir: Path
 
 class Config:
     def __init__(self, file_name: str = "config.toml"):
-        # 1. Automatyczne wyliczanie ROOT_DIR (zakładając, że loader jest w /src/ lub głównym)
-        self.ROOT_DIR = Path(__file__).resolve().parent
+        # 1. Ustalanie ścieżek bazowych
+        self.ROOT_DIR = Path(__file__).resolve().parent.parent
+        self.CONFIG_DIR = self.ROOT_DIR / "configuration"
+        config_path = self.CONFIG_DIR / file_name
 
-        config_path = self.ROOT_DIR / file_name
+        try:
+            with open(config_path, "rb") as f:
+                data = tomllib.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"KRYTYCZNY BŁĄD: Brak pliku konfiguracji w {config_path}")
 
-        with open(config_path, "rb") as f:
-            data = tomllib.load(f)
+        try:
+            # System / Debug
+            self.debug_enabled = data["system"]["debug_mode"]
 
-        self.debug_enabled = data.get("system", {}).get("debug_mode", False)
-
-        # 2. Mapowanie sekcji MAVLink
-        mav_data = data.get("mavlink", {})
-        self.mav = MAVLinkConfig(
-            device=mav_data.get("device", "/dev/ttyAMA2"),
-            baud=mav_data.get("baud", 115200),
-            mav_version=mav_data.get("mav_version", 2)
-        )
-
-        # 3. Mapowanie sekcji Drops
-        drops_data = data.get("drops", {})
-        beacon_data = drops_data.get("beacon", {})
-        bottle_data = drops_data.get("bottle", {})
-        
-        self.drops = DropsConfig(
-            cruise_speed=drops_data.get("cruise_speed", 20),
-            wind_speed=drops_data.get("wind_speed", 0),
-            wind_direction=drops_data.get("wind_direction", 0),
-            beacon=ItemConfig(
-                mass=beacon_data.get("mass", 155),
-                cd=beacon_data.get("cd", 0.27),
-                drop_course=beacon_data.get("drop_course", 0)
-            ),
-            bottle=ItemConfig(
-                mass=bottle_data.get("mass", 255),
-                cd=bottle_data.get("cd", 0.3),
-                drop_course=bottle_data.get("drop_course", 0)
+            # 2. MAVLink (Strict)
+            mav = data["mavlink"]
+            self.mav = MAVLinkConfig(
+                device=mav["device"],
+                baud=mav["baud"],
+                mav_version=mav["mav_version"]
             )
-        )
 
-        # 4. Mapowanie kamery (konwersja listy z TOML na tuple)
-        camera_data = data.get("camera", {})
-        self.camera = CameraConfig(
-            resolution=tuple(camera_data.get("resolution", [1920, 1080]))
-        )
+            # 3. Drops (Strict)
+            drops = data["drops"]
+            
+            # Pomocnicza funkcja wewnętrzna dla przedmiotów (też strict)
+            def parse_item(item_key):
+                item = drops[item_key]
+                return ItemConfig(
+                    mass=item["mass"],
+                    cd=item["cd"],
+                    drop_course=item["drop_course"]
+                )
 
-        # 5. Dynamiczne ścieżki
-        dirs_data = data.get("dirs", {})
-        logs_dir_name = dirs_data.get("logs_dir", "logs")
-        self.dirs = DirsConfig(
-            base_dir=self.ROOT_DIR,
-            logs_dir=self.ROOT_DIR / logs_dir_name
-        )
+            self.drops = DropsConfig(
+                cruise_speed=drops["cruise_speed"],
+                wind_speed=drops["wind_speed"],
+                wind_direction=drops["wind_direction"],
+                beacon=parse_item("beacon"),
+                bottle=parse_item("bottle")
+            )
 
-        self.dirs.logs_dir.mkdir(parents=True, exist_ok=True)
+            # 4. Kamera (Strict)
+            cam = data["camera"]
+            self.camera = CameraConfig(
+                resolution=tuple(cam["resolution"])
+            )
 
+            # 5. Dirs (Strict)
+            dirs = data["dirs"]
+            self.dirs = DirsConfig(
+                root_dir=self.ROOT_DIR,
+                config_dir=self.CONFIG_DIR,
+                logs_dir=self.ROOT_DIR / dirs["logs_dir"],
+                videos_dir = self.ROOT_DIR / dirs["videos_dir"],
+                photos_dir = self.ROOT_DIR / dirs["photos_dir"]
+            )
 
-# Inicjalizacja
+            # Inicjalizacja środowiska
+            self.dirs.logs_dir.mkdir(parents=True, exist_ok=True)
+            self.dirs.videos_dir.mkdir(parents=True, exist_ok=True)
+            self.dirs.photos_dir.mkdir(parents=True, exist_ok=True)
+
+        except KeyError as e:
+            raise KeyError(f"BŁĄD KONFIGURACJI: W pliku {file_name} brakuje wymaganego klucza: {e}")
+        except TypeError as e:
+            raise TypeError(f"BŁĄD TYPU: Niepoprawny format danych w {file_name}: {e}")
+
+# Przykład użycia
 try:
     cfg = Config()
-except FileNotFoundError as exc:
-    raise FileNotFoundError("Błąd: Nie znaleziono pliku config.toml!") from exc
+    print("Konfiguracja wczytana pomyślnie w trybie STRICT.")
+except Exception as e:
+    print(f"Start drona przerwany: {e}")
+    exit(1) # Zatrzymujemy program, bo bez konfigu lot jest niebezpieczny

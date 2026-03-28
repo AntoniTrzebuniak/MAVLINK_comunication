@@ -25,7 +25,9 @@ resolution = [1920, 1080]
 # Distortion
 
 [dirs]
-logs_dir = "logs"
+logs_dir = "media/logs"
+photos_dir = "media/photos"
+videos_dir = "media/videos"
 
 [system]
 debug_mode = false
