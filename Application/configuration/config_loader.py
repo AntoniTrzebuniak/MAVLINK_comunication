@@ -1,6 +1,12 @@
 import tomllib
+import tomli_w  # Wymagane do zapisu
 from dataclasses import dataclass
 from pathlib import Path
+import numpy as np
+
+# Importujemy logikę matematyczną (zakładam taką strukturę Twoich plików)
+# Jeśli plik nazywa się inaczej, dostosuj import
+from Application.calc_drop_translation.core_math import run_preflight_simulation 
 
 @dataclass(frozen=True)
 class MAVLinkConfig:
@@ -13,12 +19,15 @@ class ItemConfig:
     mass: int
     cd: float
     drop_course: int
+    x_translation: float = 0.0
+    y_translation: float = 0.0
 
 @dataclass(frozen=True)
 class DropsConfig:
     cruise_speed: int
     wind_speed: int
     wind_direction: int
+    altitude: float
     beacon: ItemConfig
     bottle: ItemConfig
 
@@ -37,26 +46,34 @@ class DirsConfig:
 
 @dataclass(frozen=True)
 class ZonesPaths:
-    search_zone_path: list[tuple[float, float]]
+    search_zone_path: str # W Twoim TOML to ścieżka do pliku .poly
 
 class Config:
     def __init__(self, file_name: str = "config.toml"):
-        # 1. Ustalanie ścieżek bazowych
         self.ROOT_DIR = Path(__file__).resolve().parent.parent
         self.CONFIG_DIR = self.ROOT_DIR / "configuration"
-        config_path = self.CONFIG_DIR / file_name
+        self.config_path = self.CONFIG_DIR / file_name
+        
+        # 1. Wczytaj dane i zainicjalizuj dataclassy
+        self._load_and_map()
+        
+        # 2. Uruchom symulację i zaktualizuj plik TOML na starcie
+        self._auto_update_simulation()
+        
 
+    def _load_and_map(self):
+        """Wczytuje TOML i mapuje na obiekty Python"""
         try:
-            with open(config_path, "rb") as f:
-                data = tomllib.load(f)
+            with open(self.config_path, "rb") as f:
+                self._raw_data = tomllib.load(f)
         except FileNotFoundError:
-            raise FileNotFoundError(f"KRYTYCZNY BŁĄD: Brak pliku konfiguracji w {config_path}")
+            raise FileNotFoundError(f"KRYTYCZNY BŁĄD: Brak pliku w {self.config_path}")
 
+        data = self._raw_data
         try:
-            # System / Debug
             self.debug_enabled = data["system"]["debug_mode"]
 
-            # 2. MAVLink (Strict)
+            # MAVLink
             mav = data["mavlink"]
             self.mav = MAVLinkConfig(
                 device=mav["device"],
@@ -64,60 +81,74 @@ class Config:
                 mav_version=mav["mav_version"]
             )
 
-            # 3. Drops (Strict)
+            # Drops
             drops = data["drops"]
-            
-            # Pomocnicza funkcja wewnętrzna dla przedmiotów (też strict)
-            def parse_item(item_key):
-                item = drops[item_key]
+            def parse_item(key):
+                it = drops[key]
                 return ItemConfig(
-                    mass=item["mass"],
-                    cd=item["cd"],
-                    drop_course=item["drop_course"]
+                    mass=it["mass"],
+                    cd=it["cd"],
+                    drop_course=it["drop_course"],
+                    x_translation=it.get("x_translation", 0.0),
+                    y_translation=it.get("y_translation", 0.0)
                 )
 
             self.drops = DropsConfig(
                 cruise_speed=drops["cruise_speed"],
                 wind_speed=drops["wind_speed"],
                 wind_direction=drops["wind_direction"],
+                altitude=drops["altitude"],
                 beacon=parse_item("beacon"),
                 bottle=parse_item("bottle")
             )
 
-            # 4. Kamera (Strict)
+            # Reszta konfiguracji
             cam = data["camera"]
-            self.camera = CameraConfig(
-                resolution=tuple(cam["resolution"])
-            )
+            self.camera = CameraConfig(resolution=tuple(cam["resolution"]))
 
-            # 5. Dirs (Strict)
             dirs = data["dirs"]
             self.dirs = DirsConfig(
                 root_dir=self.ROOT_DIR,
                 config_dir=self.CONFIG_DIR,
                 logs_dir=self.ROOT_DIR / dirs["logs_dir"],
-                videos_dir = self.ROOT_DIR / dirs["videos_dir"],
-                photos_dir = self.ROOT_DIR / dirs["photos_dir"],
-                zones_dir = self.ROOT_DIR / dirs["zones_dir"]
+                videos_dir=self.ROOT_DIR / dirs["videos_dir"],
+                photos_dir=self.ROOT_DIR / dirs["photos_dir"],
+                zones_dir=self.ROOT_DIR / dirs["zones_dir"]
             )
 
-            # Inicjalizacja środowiska
-            self.dirs.logs_dir.mkdir(parents=True, exist_ok=True)
-            self.dirs.videos_dir.mkdir(parents=True, exist_ok=True)
-            self.dirs.photos_dir.mkdir(parents=True, exist_ok=True)
-            zonesdata = data["zones"]
-            self.zones = ZonesPaths(
-                search_zone_path= zonesdata["search_zone_path"]
-            )
+            # Init folderów
+            for d in [self.dirs.logs_dir, self.dirs.videos_dir, self.dirs.photos_dir]:
+                d.mkdir(parents=True, exist_ok=True)
+
+            self.zones = ZonesPaths(search_zone_path=data["zones"]["search_zone_path"])
 
         except KeyError as e:
-            raise KeyError(f"BŁĄD KONFIGURACJI: W pliku {file_name} brakuje wymaganego klucza: {e}")
-        except TypeError as e:
-            raise TypeError(f"BŁĄD TYPU: Niepoprawny format danych w {file_name}: {e}")
+            raise KeyError(f"BŁĄD KONFIGURACJI: Brak klucza {e}")
 
-# Przykład użycia
+    def _auto_update_simulation(self):
+        """Wywołuje core_math i zapisuje wyniki do pliku TOML"""
+        # Obliczamy offsety za pomocą Twojej funkcji z core_math
+        # Funkcja powinna zwracać np. ((bx, by), (ox, oy))
+        beacon_off, bottle_off = run_preflight_simulation(self)
+
+        # Aktualizujemy surowe dane
+        self._raw_data["drops"]["beacon"]["x_translation"] = float(beacon_off[0])
+        self._raw_data["drops"]["beacon"]["y_translation"] = float(beacon_off[1])
+        self._raw_data["drops"]["bottle"]["x_translation"] = float(bottle_off[0])
+        self._raw_data["drops"]["bottle"]["y_translation"] = float(bottle_off[1])
+
+        # Zapisujemy fizycznie do pliku config.toml
+        with open(self.config_path, "wb") as f:
+            tomli_w.dump(self._raw_data, f)
+        
+        # Przeładowujemy dataclassy, aby miały nowe wartości
+        self._load_and_map()
+
+# Inicjalizacja przy starcie aplikacji
 try:
     cfg = Config()
+    print(f"Pre-flight sim done. Beacon offset: \n x: {cfg.drops.beacon.x_translation}m \n y: {cfg.drops.beacon.y_translation}m")
+    print(f"Bottle offset: \n x: {cfg.drops.bottle.x_translation}m \n y: {cfg.drops.bottle.y_translation}m")
 except Exception as e:
     print(f"Start drona przerwany: {e}")
-    exit(1) # Zatrzymujemy program, bo bez konfigu lot jest niebezpieczny
+    exit(1)

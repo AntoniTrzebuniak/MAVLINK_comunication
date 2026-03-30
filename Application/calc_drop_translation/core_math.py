@@ -162,6 +162,68 @@ def simulate_drop(
 
     return np.array(time_history), np.array(state_history)
 
+def run_preflight_simulation(cfg):
+    """Oblicza trajektorię na podstawie wiatru i parametrów z config.toml"""
+    
+    # 1. Przygotowanie środowiska (z parametrów wiatr / prędkość z TOML)
+    # Konwersja azymutu wiatru na wektor [Vx, Vy, Vz]
+    wind_rad = np.radians(cfg.drops.wind_direction)
+    wind_vec = np.array([
+        cfg.drops.wind_speed * np.cos(wind_rad),
+        cfg.drops.wind_speed * np.sin(wind_rad),
+        0.0
+    ])
+    
+    env = SimulationEnvironment(
+        wind_model=create_constant_wind(wind_vec),
+        air_density=1.225 # Można też wyciągnąć do TOML
+    )
+
+    # Prędkość podejścia samolotu (zakładamy lot na północ dla wyliczenia offsetu bazowego)
+    approach_velocity = np.array([cfg.drops.cruise_speed, 0.0, 0.0])
+
+    # 2. Obliczenia dla BEACON
+    beacon_drag_func = create_drag_area_model(
+        cd_payload=cfg.drops.beacon.cd,
+        area_payload=0.005, # Powierzchnia przekroju (dodaj do TOML!)
+        cd_parachute=0.0,    # Zakładamy brak spadochronu dla beacon
+        area_parachute=0.0,
+        deploy_time=999,
+        opening_duration=0
+    )
+    
+    solver_beacon = ShootingSolver(mass=cfg.drops.beacon.mass / 1000.0, drag_area_func=beacon_drag_func)
+    beacon_offset = solver_beacon.calculate_release_point(
+        target_position=np.array([0.0, 0.0]),
+        approach_altitude=cfg.drops.altitude,
+        approach_velocity=approach_velocity,
+        env=env
+    )
+
+    # 3. Obliczenia dla BOTTLE
+    bottle_drag_func = create_drag_area_model(
+        cd_payload=cfg.drops.bottle.cd,
+        area_payload=0.008, 
+        cd_parachute=0.0, 
+        area_parachute=0.0,
+        deploy_time=999,
+        opening_duration=0
+    )
+
+    solver_bottle = ShootingSolver(mass=cfg.drops.bottle.mass / 1000.0, drag_area_func=bottle_drag_func)
+    bottle_offset = solver_bottle.calculate_release_point(
+        target_position=np.array([0.0, 0.0]),
+        approach_altitude=cfg.drops.altitude,
+        approach_velocity=approach_velocity,
+        env=env
+    )
+
+    # 4. Zwracamy offsety zamiast aktualizować config
+    # offsety to [x, y] w układzie lokalnym
+    return beacon_offset, bottle_offset
+    
+
+
 
 class ShootingSolver:
     """class for finding release point using displacement"""

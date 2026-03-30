@@ -4,26 +4,30 @@ baud = 115200
 mav_version = 2
 
 [drops]
-cruise_speed = 20    # m/s
-wind_speed = 0       # m/s
-wind_direction = 0   # azimuth in degrees
+cruise_speed = 20
+wind_speed = 0
+wind_direction = 0
+altitude = 60
 
 [drops.beacon]
-mass = 155           # grams
-cd = 0.27            # współczynnik oporu
-drop_course = 0      # azimuth in degrees
-x_translation
+mass = 155
+cd = 0.27
+drop_course = 0
+x_translation = -61.11344194743686
+y_translation = 0.0
 
 [drops.bottle]
-mass = 255           # grams
+mass = 255
 cd = 0.3
 drop_course = 0
+x_translation = -60.47685254127766
+y_translation = 0.0
 
 [camera]
-resolution = [1920, 1080]
-# TBA
-# K matrix
-# Distortion
+resolution = [
+    1920,
+    1080,
+]
 
 [dirs]
 logs_dir = "media/logs"
@@ -34,11 +38,5 @@ zones_dir = "configuration/zones"
 [system]
 debug_mode = false
 
-
-#TBA
 [zones]
 search_zone_path = "Sloszowa_target_detection_1.poly"
-
-
-
-#map_zone

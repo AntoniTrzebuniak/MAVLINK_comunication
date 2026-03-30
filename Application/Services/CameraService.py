@@ -38,7 +38,7 @@ class CameraService:
                 ts = datetime.now().strftime("%H-%M-%S_%f")
                 img_idx = msg.img_idx
                 filename = f"IMG_{img_idx:04d}_{ts}.jpg"
-                # self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
+                #self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
                 print("robię zdjęcie")
                 lat = msg.lat / 1e7
                 lon = msg.lng / 1e7
