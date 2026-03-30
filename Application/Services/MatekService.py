@@ -118,7 +118,7 @@ class MatekService:
             return mission
 
         count = msg.count
-        self.logger.info(f"Mission has {count} items")
+        self.logger.debug(f"Mission has {count} items")
 
         for i in range(count):
             #self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
@@ -144,7 +144,7 @@ class MatekService:
                 })
 
 
-                self.logger.info(f"""
+                self.logger.debug(f"""
                 --- MISSION ITEM {item.seq} ---
                 command: {item.command}
                 frame: {item.frame}
@@ -544,10 +544,7 @@ class MatekService:
         """
         current = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=3)
         if current:
-            return {
-                "current_waypoint": current.seq,
-                "total_waypoints": len(self.get_mission())
-            }
+            return current.seq, len(self.get_mission())-1  # pomijamy waypoint home
         return None
 
     def wait_for_command_ack(self, command: int, timeout: int = 5) -> bool:
@@ -575,18 +572,18 @@ class MatekService:
         :return: Dict with coordinates, mission_status, mode, and armed status
         """
         coords = self.get_current_coordinates()
-        status = self.get_mission_status()
+        curr_wp, total_wp = self.get_mission_status()
         mode = self.get_current_mode()
         armed = self.is_armed()
 
-        if coords and status:
+        if coords and curr_wp is not None:
             self.logger.info(f"Position: {coords[0]:.6f}, {coords[1]:.6f}, Alt: {coords[2]:.1f}m")
             self.logger.info(
-                f"Mission: {status['current_waypoint']}/{status['total_waypoints'] - 1} | Mode: {mode} | Armed: {armed}")
+                f"Mission: {curr_wp}/{total_wp} | Mode: {mode} | Armed: {armed}")
 
         return {
             "coordinates": coords,
-            "mission_status": status,
+            "mission_status": (curr_wp, total_wp),
             "mode": mode,
             "armed": armed
         }
@@ -600,46 +597,6 @@ class MatekService:
         if hasattr(self, 'master'):
             self.master.close()
             print("MAVLink connection closed")
-
-    def sandbox(self) -> List[Dict[str, float]]:
-        mission = []
-
-        # Zapytaj o misję
-        self.master.mav.mission_request_list_send(self.master.target_system, self.master.target_component)
-
-        msg = self.master.recv_match(type='MISSION_COUNT', blocking=True, timeout=5)
-        if not msg:
-            print("No mission count received")
-            return mission
-
-        count = msg.count
-        print(f"Mission has {count} waypoints")
-
-        for i in range(count):
-            self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
-
-            while True:
-                item = self.master.recv_match(blocking=True, timeout=5)
-                if not item:
-                    print(f"Timeout waiting for waypoint {i}")
-                    return mission
-
-                if item.get_type() in ["MISSION_ITEM", "MISSION_ITEM_INT"]:
-                    mission.append({
-                        "seq": item.seq,
-                        "lat": item.x, #/ 1e7 if hasattr(item, "x") else item.x,
-                        "lon": item.y, #/ 1e7 if hasattr(item, "y") else item.y,
-                        "alt": item.z,
-                        "command": item.command
-                    })
-                    break  # przechodzimy do kolejnego waypointa
-        mission.pop(0)
-        # Odbierz ACK na końcu
-        ack = self.master.recv_match(type='MISSION_ACK', blocking=True, timeout=5)
-        if ack:
-            print(f"Mission download ACK: {ack.type}")
-
-        return mission
     
     def add_drop_waypoint(self, new_waypoint):
         print("START")
@@ -737,7 +694,45 @@ class MatekService:
             self.master.close()
             self.logger.info("MAVLink connection closed")
 
+    def sandbox(self) -> List[Dict[str, float]]:
+        mission = []
 
+        # Zapytaj o misję
+        self.master.mav.mission_request_list_send(self.master.target_system, self.master.target_component)
+
+        msg = self.master.recv_match(type='MISSION_COUNT', blocking=True, timeout=5)
+        if not msg:
+            print("No mission count received")
+            return mission
+
+        count = msg.count
+        print(f"Mission has {count} waypoints")
+
+        for i in range(count):
+            self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
+
+            while True:
+                item = self.master.recv_match(blocking=True, timeout=5)
+                if not item:
+                    print(f"Timeout waiting for waypoint {i}")
+                    return mission
+
+                if item.get_type() in ["MISSION_ITEM", "MISSION_ITEM_INT"]:
+                    mission.append({
+                        "seq": item.seq,
+                        "lat": item.x, #/ 1e7 if hasattr(item, "x") else item.x,
+                        "lon": item.y, #/ 1e7 if hasattr(item, "y") else item.y,
+                        "alt": item.z,
+                        "command": item.command
+                    })
+                    break  # przechodzimy do kolejnego waypointa
+        mission.pop(0)
+        # Odbierz ACK na końcu
+        ack = self.master.recv_match(type='MISSION_ACK', blocking=True, timeout=5)
+        if ack:
+            print(f"Mission download ACK: {ack.type}")
+
+        return mission
 
 '''
 if __name__ == "_main__":      # zamierzone użycie klasy

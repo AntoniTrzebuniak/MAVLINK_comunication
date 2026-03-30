@@ -10,13 +10,6 @@ from Application.Services.MatekService import MatekService
 
 
 
-
-# --- INICJALIZACJA KAMERY ---
-
-
-# Inicjalizacja CSV
-
-
 class CameraService:
     def __init__(self, drone: MatekService):
         self.logger = get_logger(__name__)

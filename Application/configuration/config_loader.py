@@ -33,6 +33,11 @@ class DirsConfig:
     config_dir: Path
     videos_dir: Path
     photos_dir: Path
+    zones_dir: Path
+
+@dataclass(frozen=True)
+class ZonesPaths:
+    search_zone_path: list[tuple[float, float]]
 
 class Config:
     def __init__(self, file_name: str = "config.toml"):
@@ -92,13 +97,18 @@ class Config:
                 config_dir=self.CONFIG_DIR,
                 logs_dir=self.ROOT_DIR / dirs["logs_dir"],
                 videos_dir = self.ROOT_DIR / dirs["videos_dir"],
-                photos_dir = self.ROOT_DIR / dirs["photos_dir"]
+                photos_dir = self.ROOT_DIR / dirs["photos_dir"],
+                zones_dir = self.ROOT_DIR / dirs["zones_dir"]
             )
 
             # Inicjalizacja środowiska
             self.dirs.logs_dir.mkdir(parents=True, exist_ok=True)
             self.dirs.videos_dir.mkdir(parents=True, exist_ok=True)
             self.dirs.photos_dir.mkdir(parents=True, exist_ok=True)
+            zonesdata = data["zones"]
+            self.zones = ZonesPaths(
+                search_zone_path= zonesdata["search_zone_path"]
+            )
 
         except KeyError as e:
             raise KeyError(f"BŁĄD KONFIGURACJI: W pliku {file_name} brakuje wymaganego klucza: {e}")
@@ -108,7 +118,6 @@ class Config:
 # Przykład użycia
 try:
     cfg = Config()
-    print("Konfiguracja wczytana pomyślnie w trybie STRICT.")
 except Exception as e:
     print(f"Start drona przerwany: {e}")
     exit(1) # Zatrzymujemy program, bo bez konfigu lot jest niebezpieczny

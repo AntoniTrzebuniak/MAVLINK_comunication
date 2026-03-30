@@ -12,6 +12,7 @@ wind_direction = 0   # azimuth in degrees
 mass = 155           # grams
 cd = 0.27            # współczynnik oporu
 drop_course = 0      # azimuth in degrees
+x_translation
 
 [drops.bottle]
 mass = 255           # grams
@@ -28,12 +29,16 @@ resolution = [1920, 1080]
 logs_dir = "media/logs"
 photos_dir = "media/photos"
 videos_dir = "media/videos"
+zones_dir = "configuration/zones"
 
 [system]
 debug_mode = false
 
 
 #TBA
-#[zones]
-#search_zone
+[zones]
+search_zone_path = "Sloszowa_target_detection_1.poly"
+
+
+
 #map_zone

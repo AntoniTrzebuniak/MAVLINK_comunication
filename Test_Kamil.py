@@ -1,9 +1,9 @@
  # Initialize connection\n
-from PixHawkService import PixHawkService
+from Application.Services.MatekService import MatekService
 
 
 
-drone = PixHawkService(device="tcp:172.20.10.3:5763")
+drone = MatekService(device="tcp:192.168.0.186:5763")
 print("Inicjalizacja programu")
 
 

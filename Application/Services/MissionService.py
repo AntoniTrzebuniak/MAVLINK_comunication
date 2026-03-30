@@ -1,5 +1,7 @@
 from __future__ import annotations
 from Application.Services.MatekService import MatekService
+from Application.configuration.config_loader import cfg     # mandatory
+from Application.Logger.log_module import get_logger
 import numpy as np
 from pymavlink import mavutil, mavextra
 from typing import Tuple, List, Dict, Optional
@@ -13,7 +15,7 @@ class MissionService:
     """
     def __init__(self, drone: MatekService, resolution: tuple):
         self.logger = get_logger(__name__)
-        self.image_width, self.image_height = resolution
+        self.image_width, self.image_height = cfg.camera.resolution
         self.GEOFENCE = [
             (40.7352710, 30.0884038),
             (40.7339580, 30.0882322),
@@ -21,7 +23,7 @@ class MissionService:
             (40.7354823, 30.0858986)
         ]
         self.POLES = [(),()]
-        self.TRG_CANDIDATES=[] #{"lat": lat, "lon": lon, "count": 1, "isRed": isRed}
+        self.TRG_CANDIDATES=[] #{"lat": lat, "lon": lon, "count": 1, "isBottle": isBottle}
         self.NEW_MISSION=[{"lat": 40.7342403, "lon": 30.0897108, "alt": 55.75, "acr": 16},
                             {"lat": 40.0, "lon": 0.0, "alt": 40.0, "acr": 22},
                             {"lat": 40.7347669, "lon": 30.0849867, "alt": 40.0, "acr": 16},
@@ -134,67 +136,68 @@ class MissionService:
         print("detected point", lat_t, lon_t)
         return lat_t, lon_t
 
-    def isinrect(self, lat, lon) -> bool:
+    def isinrect(self, lat, lon, rect: list[tuple[float, float]]) -> bool:
         # Define corners as a list of (lat, lon) tuples in order
-        num = len(self.GEOFENCE)
+        num = len(rect)
         inside = False
 
         for i in range(num):
             j = (i + 1) % num
-            xi, yi = self.GEOFENCE[i][1], self.GEOFENCE[i][0]
-            xj, yj = self.GEOFENCE[j][1], self.GEOFENCE[j][0]
+            xi, yi = rect[i][1], rect[i][0]
+            xj, yj = rect[j][1], rect[j][0]
             if ((yi > lat) != (yj > lat)) and \
             (lon < (xj - xi) * (lat - yi) / (yj - yi + 1e-12) + xi):
                 inside = not inside
         return inside
     
-    def is_target(self, lat, lon):
+    def is_target(self, lat, lon, threshold=5):
         """
-        Returns True if (lat, lon) is within 5 meters of any target in self.TRG_CANDIDATES.
+        Returns True if (lat, lon) is within threshold in meters of any target in self.TRG_CANDIDATES.
         Also, increment counter if true.
-        self.TRG_CANDIDATES should be a list of (lat, lon, count, isRed) dicts.
+        self.TRG_CANDIDATES should be a list of (lat, lon, count, isBottle) dicts.
         """
         for target in self.TRG_CANDIDATES:
             t_lat, t_lon = target
             distance_lat = abs(lat-t_lat)
             distance_lon = abs(lon-t_lon)
 
-            if distance_lat*111_320 <= 5:
-                if distance_lon*85000 <=5:
+            if distance_lat*111_320 <= threshold:       # TODO: zmienić na coś dynamicznego, zależnego od szerokości geograficznej
+                if distance_lon*85000 <=threshold:
                     target["count"]+=1
                     return True
         return False
     
-    def insert_target(self, lat, lon, isRed: bool):
-        self.TRG_CANDIDATES.append({"lat": lat, "lon": lon, "count": 1, "isRed": isRed})
+    def insert_target(self, lat, lon, isBottle: bool):
+        self.TRG_CANDIDATES.append({"lat": lat, "lon": lon, "count": 1, "isBottle": isBottle})
 
-    def process_target(self, pixel, isRed)-> bool:
+    def process_target(self, pixel, isBottle: bool)-> bool:
         res = self.calculate_target_cords(pixel)
         if res is None:
             return False
         lat, lon = res
-        if not self.isinrect(lat, lon):
+        if not self.isinrect(lat, lon, self.GEOFENCE):
             return False
         if not self.is_target(lat, lon):
-            self.insert_target(lat, lon, isRed)
+            self.insert_target(lat, lon, isBottle)
         return True
-        
+
     def select_targets(self):
         """
-        Wybiera dwa słowniki o największych wartościach 'count' z self.TRG_CANDIDATES,
-        usuwa resztę z listy i zwraca listę tych dwóch słowników.
-        Jeśli kandydatów jest mniej niż dwóch, zwraca tyle ile jest.
+            Wybiera dwa słowniki o największych wartościach 'count' z self.TRG_CANDIDATES,
+            usuwa resztę z listy i zwraca listę tych dwóch słowników.
+            Jeśli kandydatów jest mniej niż dwóch, zwraca tyle ile jest.
         """
         if self.TRG_CANDIDATES==[]:
             return None
         # Sortuj malejąco po 'count'
         sorted_candidates = sorted(self.TRG_CANDIDATES, key=lambda t: t["count"], reverse=True)
         # Usuń drugiego kandydata jeśli oba mają ten sam kolor, powtarzaj aż będą różne lub zostanie jeden
-        while len(sorted_candidates) > 1 and (sorted_candidates[0]["isRed"] == sorted_candidates[1]["isRed"]):
+        while len(sorted_candidates) > 1 and (sorted_candidates[0]["isBottle"] == sorted_candidates[1]["isBottle"]):
             sorted_candidates.pop(1)
         top_two = sorted_candidates[:2]
         # Zastąp listę tylko tymi dwoma
         self.TRG_CANDIDATES = top_two
+        return top_two
 
 
     def calc_drop_waypoints(self, trg_dict: dict, yaw: float, container: list, alt=40):
@@ -216,7 +219,7 @@ class MissionService:
             # użyj mavextra.gps_offset do przeliczenia na lat/lon
             wp_lat, wp_lon = mavextra.gps_offset(trg_dict["lat"], trg_dict["lon"], north, east)
             container.append({"lat": wp_lat, "lon": wp_lon, "alt": alt, "acr": acr, "cmd": "NAV"})
-        if trg_dict["isRed"]:
+        if trg_dict["isBottle"]:
             container.insert(2, {"pwm": PixHawkService.PWM_DROP_SERVO, "ch": PixHawkService.RED_CH, "cmd": PixHawkService.SET_SERVO_CMD})
         else:
             container.insert(2, {"pwm": PixHawkService.PWM_DROP_SERVO, "ch": PixHawkService.BLUE_CH, "cmd": PixHawkService.SET_SERVO_CMD})
@@ -225,6 +228,18 @@ class MissionService:
     def prepare_wps(self, path1, path2):
         self.NEW_MISSION[12:12], self.NEW_MISSION[20:20] = path1, path2
 
+    @staticmethod
+    def read_rect_from_file(filename) -> list[tuple[float, float]]:
+        rect = []
+        with open(filename, 'r') as f:
+            i = 0
+            for line in f:
+                lat_str, lon_str = line.strip().split(' ')
+                rect.append((float(lat_str), float(lon_str)))
+                i+=1
+                if i>3:
+                    break
+        return rect
 
 if __name__ == "__main__":
     a=1
