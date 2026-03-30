@@ -5,29 +5,35 @@ mav_version = 2
 
 [drops]
 cruise_speed = 20
-wind_speed = 0
-wind_direction = 0
+wind_speed = 4
+wind_direction = 315
 altitude = 60
 
 [drops.beacon]
 mass = 155
 cd = 0.27
 drop_course = 0
-x_translation = -61.11344194743686
-y_translation = 0.0
+x_translation = -63.70411628375962
+y_translation = 1.8606090503821038
 
 [drops.bottle]
 mass = 255
 cd = 0.3
 drop_course = 0
-x_translation = -60.47685254127766
-y_translation = 0.0
+x_translation = -63.264754630039086
+y_translation = 1.9988650672363435
 
 [camera]
 resolution = [
     1920,
     1080,
 ]
+K = [
+    [1773.9244383143994, 0.0, 1152.0],
+    [0.0, 1733.1547280645818, 648.0],
+    [0.0, 0.0, 1.0]
+]
+distortion = [-0.1359832, 0.36278877, 0.02114295, 0.02506856, -0.21990155]
 
 [dirs]
 logs_dir = "media/logs"

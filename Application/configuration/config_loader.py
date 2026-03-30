@@ -104,7 +104,10 @@ class Config:
 
             # Reszta konfiguracji
             cam = data["camera"]
-            self.camera = CameraConfig(resolution=tuple(cam["resolution"]))
+            self.camera = CameraConfig(resolution=tuple(cam["resolution"])
+                        K=np.array(cam["k_matrix"], dtype=np.float32),
+                        distortion=np.array(cam["distortion"], dtype=np.float32)
+            )
 
             dirs = data["dirs"]
             self.dirs = DirsConfig(
