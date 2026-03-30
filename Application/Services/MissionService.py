@@ -7,6 +7,7 @@ from pymavlink import mavutil, mavextra
 from typing import Tuple, List, Dict, Optional
 import cv2
 
+
 class MissionService:
     """
     Args:
@@ -165,7 +166,9 @@ class MissionService:
         return top_two
 
 
-    def calc_drop_waypoints(self, trg_dict: dict, yaw: float, container: list, alt=40):
+    def calc_drop_waypoints(self, trg_dict: dict, yaw: float, container: list, alt=40): 
+        #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające
+
         """
         Oblicza 3 waypointy leżące na linii o zadanym kierunku (yaw, w radianach), 
 
@@ -185,9 +188,9 @@ class MissionService:
             wp_lat, wp_lon = mavextra.gps_offset(trg_dict["lat"], trg_dict["lon"], north, east)
             container.append({"lat": wp_lat, "lon": wp_lon, "alt": alt, "acr": acr, "cmd": "NAV"})
         if trg_dict["isBottle"]:
-            container.insert(2, {"pwm": PixHawkService.PWM_DROP_SERVO, "ch": PixHawkService.RED_CH, "cmd": PixHawkService.SET_SERVO_CMD})
+            container.insert(2, {"pwm": MatekService.PWM_DROP_SERVO, "ch": MatekService.RED_CH, "cmd": MatekService.SET_SERVO_CMD})
         else:
-            container.insert(2, {"pwm": PixHawkService.PWM_DROP_SERVO, "ch": PixHawkService.BLUE_CH, "cmd": PixHawkService.SET_SERVO_CMD})
+            container.insert(2, {"pwm": MatekService.PWM_DROP_SERVO, "ch": MatekService.BLUE_CH, "cmd": MatekService.SET_SERVO_CMD})
         return container
 
     @staticmethod
