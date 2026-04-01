@@ -23,7 +23,11 @@ class CameraService:
         config["main"]["quality"] = 100
         self.picam.configure(config)
         self.picam.start()
-        self.picam.set_controls({"AfMode": 2, "ExposureTime": 10000})
+        self.picam.set_controls({"ExposureTime": 10000,
+                                    "AfMode": 0,          # 0 = Manual Focus (blokuje silniczek AF)
+                                    "LensPosition": 0.0,  # 0.0 = Nieskończoność (dioptrie)
+                                    "AfRange": 0          # 0 = Normal (opcjonalnie, ogranicza zakres pracy)
+                                })
         
         with open(self.LOG_FILE, 'w', newline='') as f:
             csv.writer(f).writerow(['Filename', 'Index', 'Lat', 'Lon', 'Alt', 'Roll', 'Pitch', 'Yaw'])
