@@ -9,7 +9,6 @@ from Application.Logger.log_module import get_logger
 from Application.Services.MatekService import MatekService
 
 
-
 class CameraService:
     def __init__(self, drone: MatekService):
         self.logger = get_logger(__name__)
@@ -19,9 +18,12 @@ class CameraService:
         self.LOG_FILE = self.PHOTOS_MISSION_DIR / 'photos_position.csv'
         self.drone = drone
 
-        #self.picam = Picamera2()
-        #self.picam.configure(self.picam.create_still_configuration())
-        #self.picam.start()
+        self.picam = Picamera2()
+        config = self.picam.create_still_configuration(main={"size": (2304, 1296)})
+        config["main"]["quality"] = 100
+        self.picam.configure(config)
+        self.picam.start()
+        self.picam.set_controls({"AfMode": 2, "ExposureTime": 10000})
         
         with open(self.LOG_FILE, 'w', newline='') as f:
             csv.writer(f).writerow(['Filename', 'Index', 'Lat', 'Lon', 'Alt', 'Roll', 'Pitch', 'Yaw'])
@@ -38,8 +40,8 @@ class CameraService:
                 ts = datetime.now().strftime("%H-%M-%S_%f")
                 img_idx = msg.img_idx
                 filename = f"IMG_{img_idx:04d}_{ts}.jpg"
-                #self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
-                print("robię zdjęcie")
+                self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
+                self.logger.info(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
                 lat = msg.lat / 1e7
                 lon = msg.lng / 1e7
                 alt = msg.alt_msl        # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)

@@ -34,6 +34,8 @@ class DropsConfig:
 @dataclass(frozen=True)
 class CameraConfig:
     resolution: tuple[int, int]
+    K: np.ndarray
+    distortion: np.ndarray
 
 @dataclass(frozen=True)
 class DirsConfig:
@@ -89,8 +91,8 @@ class Config:
                     mass=it["mass"],
                     cd=it["cd"],
                     drop_course=it["drop_course"],
-                    x_translation=it.get("x_translation", 0.0),
-                    y_translation=it.get("y_translation", 0.0)
+                    x_translation=it["x_translation"],
+                    y_translation=it["y_translation"]
                 )
 
             self.drops = DropsConfig(
@@ -104,8 +106,8 @@ class Config:
 
             # Reszta konfiguracji
             cam = data["camera"]
-            self.camera = CameraConfig(resolution=tuple(cam["resolution"])
-                        K=np.array(cam["k_matrix"], dtype=np.float32),
+            self.camera = CameraConfig(resolution=tuple(cam["resolution"]),
+                        K=np.array(cam["K"], dtype=np.float32),
                         distortion=np.array(cam["distortion"], dtype=np.float32)
             )
 

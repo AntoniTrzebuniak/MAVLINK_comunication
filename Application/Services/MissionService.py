@@ -166,18 +166,25 @@ class MissionService:
         return top_two
 
 
-    def calc_drop_waypoints(self, trg_dict: dict, yaw: float, container: list, alt=40): 
+    def calc_drop_waypoints(self, trg_dict: dict, container: list) -> List[dict]: 
         #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające
-
         """
         Oblicza 3 waypointy leżące na linii o zadanym kierunku (yaw, w radianach), 
 
         Args:
-            yaw: kierunek w radianach (0 = północ, pi/2 = wschód)
+            yaw: kierunek w stopniach (0 = północ, pi/2 = wschód)
         Returns: 
             lista: [(lat1, lon1), (lat2, lon2), (lat3, lon3)]
         """
-        dist_and_acr = [(80, 40), (62, 5), (40, 40)]  # metry przed targetem
+        cfg.drops.bottle.x_translation
+        cfg.drops.bottle.y_translation
+        cfg.drops.bottle.drop_course
+        cfg.drops.beacon.x_translation
+        cfg.drops.beacon.y_translation
+        cfg.drops.beacon.drop_course
+        cfg.drops.altitude
+        
+        dist_and_acr = [(80, 40), (62, 5), (40, 40)]  # (metry przed targetem, ACR)
 
         # Przesunięcie "przed target" to minus yaw (czyli -yaw)
         for d, acr in dist_and_acr:
