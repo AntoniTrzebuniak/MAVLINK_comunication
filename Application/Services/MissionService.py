@@ -167,7 +167,7 @@ class MissionService:
 
 
     def calc_drop_waypoints(self, trg_dict: dict, container: list) -> List[dict]: 
-        #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające
+        #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające asdfasd
         """
         Oblicza 3 waypointy leżące na linii o zadanym kierunku (yaw, w radianach), 
 
