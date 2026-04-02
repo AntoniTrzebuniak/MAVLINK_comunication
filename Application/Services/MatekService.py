@@ -123,7 +123,7 @@ class MatekService:
             return mission
 
         count = msg.count
-        self.logger.debug(f"Mission has {count} items")
+        self.logger.info(f"Mission has {count} items")
 
         for i in range(count):
             #self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
@@ -148,23 +148,23 @@ class MatekService:
                     "param7": item.z,
                 })
 
-
-                self.logger.debug(f"""
-                --- MISSION ITEM {item.seq} ---
-                command: {item.command}
-                frame: {item.frame}
-                current: {item.current}
-                autocontinue: {item.autocontinue}
-
-                param1: {item.param1}
-                param2: {item.param2}
-                param3: {item.param3}
-                param4: {item.param4}
-                param5(x): {item.x}
-                param6(y): {item.y}
-                param7(z): {item.z}
-                ----------------------------
-                """)
+                """
+                self.logger.debug(
+                    f"--- MISSION ITEM {item.seq} ---\n"
+                    f"command: {item.command}\n"
+                    f"frame: {item.frame}\n"
+                    f"current: {item.current}\n"
+                    f"autocontinue: {item.autocontinue}\n\n"
+                    f"param1: {item.param1}\n"
+                    f"param2: {item.param2}\n"
+                    f"param3: {item.param3}\n"
+                    f"param4: {item.param4}\n"
+                    f"param5(x): {item.x}\n"
+                    f"param6(y): {item.y}\n"
+                    f"param7(z): {item.z}\n"
+                    f"----------------------------"
+                )
+                """
 
         return mission
 
@@ -220,7 +220,7 @@ class MatekService:
                 self.master.mav.mission_item_int_send(
                     self.master.target_system,
                     self.master.target_component,
-                    i,
+                    idx_to_send,
                     wp["frame"],
                     cmd,
                     is_current,
@@ -241,7 +241,7 @@ class MatekService:
                     self.master.mav.mission_item_int_send(
                         self.master.target_system,
                         self.master.target_component,
-                        i,
+                        idx_to_send,
                         mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
                         mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                         is_current,
@@ -312,7 +312,7 @@ class MatekService:
         """
         Sets current waypoint index (0-based)
         """
-        real_index = index + 1  # przesunięcie przez index home w funkcji set_waypoints
+        real_index = index
 
         self.master.mav.mission_set_current_send(
             self.master.target_system,
@@ -643,7 +643,7 @@ class MatekService:
                 })
 
         if not nav_mission:
-            return self.set_waypoints([container])
+            return self.set_waypoints(container)
 
         for i in range(1, len(nav_mission) + 1):
             i = i % len(nav_mission)
