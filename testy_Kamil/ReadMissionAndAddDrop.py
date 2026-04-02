@@ -15,15 +15,15 @@ drone_mission = MissionService(drone,resolution)
 print("Inicjalizacja programu")
 
 
-waypoints = [
-    {"command": "WAYPOINT", "lat": -35.363261, "lon": -100.165230, "alt": 20, "acr": 0},
-    {"command": "WAYPOINT", "lat": -35.363500, "lon": -110.165500, "alt": 25, "acr": 0},
-    {"command": "WAYPOINT", "lat": -35.363500, "lon": -110.165500, "alt": 25, "acr": 0},
-]
-append = [
+waypoints = drone.get_mission()
+droppoint = [
     {"command": "WAYPOINT", "lat": -35.363800, "lon": 100.165800, "alt": 20, "acr": 0},
-    {"command": "WAYPOINT", "lat": -35.364000, "lon": 110.166000, "alt": 25, "acr": 0},
 ]
 
 
-drone.append_waypoints(append)
+#Założenie : waypointy zostają dodane w mission planerze. Wykonane zostaje jedno kółko w celu zidentyfikowania celu. Następnie 
+# misja zostaje skopiowana i dodana na koniec obecnej misji wraz z sekwencją zrzutu.
+container = drone_mission.calc_drop_waypoints(droppoint, yaw=10, container=[], isRed=True)
+new_mission = drone.add_drop_sequence(container)
+drone.append_waypoints(new_mission)
+
