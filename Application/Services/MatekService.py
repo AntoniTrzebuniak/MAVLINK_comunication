@@ -598,12 +598,16 @@ class MatekService:
             self.master.close()
             print("MAVLink connection closed")
     
-    def add_drop_waypoint(self, new_waypoint):
+    
+    def add_drop_sequence(self, container: list[Dict[str, Any]]):
+        drop_wp = container[2]
         print("START")
         mission = self.get_mission()
 
         if mission:
             mission = mission[1:] 
+        else :
+            mission = []
 
         best_idx = -1
         best_distance = 10**100
@@ -620,35 +624,37 @@ class MatekService:
                 })
 
         if not nav_mission:
-            return [new_waypoint]
+            return self.set_waypoints([container])
 
         for i in range(1, len(nav_mission) + 1):
             i = i % len(nav_mission)
             future_waypoint = nav_mission[i]
             prev_waypoint = nav_mission[i - 1]
 
-            new_lat = new_waypoint["lat"]
-            new_lon = new_waypoint["lon"]
+            new_lat = drop_wp["lat"]
+            new_lon = drop_wp["lon"]
             prev_lat = prev_waypoint["lat"]
             prev_lon = prev_waypoint["lon"]
 
             distance = (new_lat - prev_lat) ** 2 + (new_lon - prev_lon) ** 2
 
-            print(f"previous wp: {prev_waypoint}\nfuture wp: {future_waypoint}\ndistance = {distance}")
-            print("\n\n\n")
+            self.logger.info(f"previous wp: {prev_waypoint}\nfuture wp: {future_waypoint}\ndistance = {distance}\n")
+
 
             if distance < best_distance:
                 best_distance = distance
                 best_idx = i
 
         if best_idx == 0:
-            mission = mission + [new_waypoint]
+            mission = mission + container
         else:
             real_idx = nav_mission[best_idx]["idx"]
-            mission = mission[:real_idx] + [new_waypoint] + mission[real_idx:]
+            mission = mission[:real_idx] + container + mission[real_idx:]
 
-        return self.set_waypoints(mission)
-    
+        #return self.set_waypoints(mission)
+        return mission
+
+
     def get_attitude(self, timeout=1):
         msg_att = self.master.recv_match(type='ATTITUDE', blocking=True, timeout=timeout)
         if msg_att is None:
