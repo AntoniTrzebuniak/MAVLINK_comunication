@@ -22,7 +22,7 @@ print("Inicjalizacja programu")
 waypoints = drone.get_mission()
 #target = {"command": "WAYPOINT", "lat": -33.0000, "lon": 149.165230, "isBottle": True}
 
-drop_point = {"command": "WAYPOINT", "lat": -33.0000, "lon": 149.165230, "alt": 20, "acr": 0}
+drop_point = {"command": "WAYPOINT", "lat": -35.1266480, "lon": 149.0267944, "alt": 20, "acr": 0}
 
 
 
@@ -40,4 +40,5 @@ container = drone_mission.calc_drop_waypoints(
 )
 new_mission = drone.add_drop_sequence(container)
 drone.append_waypoints(new_mission)
+drone.set_mode("AUTO")
 
