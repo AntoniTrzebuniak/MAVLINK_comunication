@@ -70,13 +70,26 @@ class MatekService:
             self.logger.exception("Connection failed: %s", e)
             raise
 
+    def _recv_autopilot_message(self, msg_type, timeout=5):
+        end_time = time.time() + timeout
+
+        while time.time() < end_time:
+            msg = self.master.recv_match(type=msg_type, blocking=True, timeout=0.5)
+            if not msg:
+                continue
+
+            if msg.get_srcSystem() == self.master.target_system and msg.get_srcComponent() == 1:
+                return msg
+
+        return None
+
     def get_current_coordinates(self, timeout=2) -> Optional[Tuple[float, float, float]]:
         """
         Reads current GPS position (lat, lon, alt).
 
         :return: Tuple of (latitude, longitude, altitude) or None if no GPS data
         """
-        msg = self.master.recv_match(type='GLOBAL_POSITION_INT', blocking=True, timeout=timeout)
+        msg = self._recv_autopilot_message('GLOBAL_POSITION_INT', timeout=timeout)
         if not msg:
             self.logger.warning("No GPS data received.")
             return None
@@ -94,18 +107,14 @@ class MatekService:
         return False
 
     def get_current_mode(self) -> str:
-        """
-        Gets the current flight mode.
+        msg = self._recv_autopilot_message('HEARTBEAT', timeout=5)
+        if not msg:
+            return "UNKNOWN"
 
-        :return: current flight mode or 'UNKNOWN'
-        """
-        msg = self.master.recv_match(type='HEARTBEAT', blocking=True, timeout=5)
-        if msg:
-            # Convert mode number to mode name
-            mode_mapping = self.master.mode_mapping()
-            for mode_name, mode_id in mode_mapping.items():
-                if mode_id == msg.custom_mode:
-                    return mode_name
+        mode_mapping = self.master.mode_mapping()
+        for mode_name, mode_id in mode_mapping.items():
+            if mode_id == msg.custom_mode:
+                return mode_name
         return "UNKNOWN"
 
     def get_mission(self) -> List[Dict[str, Any]]:
@@ -320,7 +329,7 @@ class MatekService:
             real_index
         )
         # Wait for acknowledgment
-        ack = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=5)
+        ack = self._recv_autopilot_message('MISSION_CURRENT', timeout=5)
 
         if ack and ack.seq == real_index:
             self.logger.info(f"Successfully set current waypoint to index {index}")
@@ -561,7 +570,7 @@ class MatekService:
 
         return: tuple (current waypoint, total waypoints ammount)
         """
-        current = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=5)
+        current = self._recv_autopilot_message('MISSION_CURRENT', timeout=5)
         if current:
             return current.seq
         return None
@@ -674,14 +683,15 @@ class MatekService:
         return mission[1:]
 
 
-    def get_attitude(self, timeout=1):
-        msg_att = self.master.recv_match(type='ATTITUDE', blocking=True, timeout=timeout)
+    def get_attitude(self, timeout=2):
+        msg_att = self._recv_autopilot_message('ATTITUDE', timeout=timeout)
         if msg_att is None:
             self.logger.warning("No attitude data received")
             return None
-        roll  = msg_att.roll    # rad +prawo -lewo
-        pitch = msg_att.pitch   # rad +góra  -dół
-        yaw   = msg_att.yaw     # rad +prawo -lewo
+
+        roll = msg_att.roll
+        pitch = msg_att.pitch
+        yaw = msg_att.yaw
         return roll, pitch, yaw
     
     def set_servo(self, channel: int, pwm: int) -> bool:
@@ -799,6 +809,7 @@ def rot_matrix(roll, pitch, yaw):
                     [-np.sin(yaw),  np.cos(yaw), 0],
                     [0, 0, 1]])
         return Rz @ Ry @ Rx
+
 
 
 

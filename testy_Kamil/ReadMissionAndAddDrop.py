@@ -22,7 +22,7 @@ print("Inicjalizacja programu")
 waypoints = drone.get_mission()
 #target = {"command": "WAYPOINT", "lat": -33.0000, "lon": 149.165230, "isBottle": True}
 
-drop_point = {"command": "WAYPOINT", "lat": -35.1266480, "lon": 149.0267944, "alt": 20, "acr": 0}
+drop_point = {"command": "WAYPOINT", "lat": -35.3243695, "lon": 149.1483307, "alt": 20, "acr": 0}
 
 
 
