@@ -47,7 +47,7 @@ droppoint = {"command": "WAYPOINT", "lat": -33.0000, "lon": 149.165230, "alt": 2
 
 mission = drone.get_mission()
 print("Mission read successfully")
-cur_waypoint, waypoint_number = drone.get_mission_status()
+cur_waypoint = drone.get_mission_status()
 
 
 
