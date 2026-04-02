@@ -437,10 +437,6 @@ class MatekService:
             self.logger.warning(f"Mode change failed. Current mode: {current_mode}")
             return False
 
-
-
-
-# dotąd sprawdzałem czy działa i naprawiałem
     def check_prearm_status(self) -> bool:
         """
         Checks GPS, EKF, and system status before arming.
@@ -616,16 +612,6 @@ class MatekService:
             "armed": armed
         }
 
-    def close(self) -> None:
-        """
-        Closes the MAVLink connection.
-
-        Should be called when finished to properly cleanup resources.
-        """
-        if hasattr(self, 'master'):
-            self.master.close()
-            print("MAVLink connection closed")
-    
     
     def add_drop_sequence(self, container: list[Dict[str, Any]]):
         drop_wp = container[2]
@@ -694,31 +680,7 @@ class MatekService:
         yaw = msg_att.yaw
         return roll, pitch, yaw
     
-    def set_servo(self, channel: int, pwm: int) -> bool:
-        """
-        Sets a servo output using.
-        Works on ArduPilot (channels usually start at 1 = AUX1).
 
-        :param channel: Servo channel number (e.g. 5 = AUX1)
-        :param pwm: PWM value in microseconds (typically 1000–2000)
-        :return: True if command was acknowledged, False otherwise
-        """
-        self.logger.info(f"Setting servo channel {channel} to {pwm}µs")
-
-        # Send command
-        self.master.mav.command_long_send(
-            self.master.target_system,
-            self.master.target_component,
-            mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
-            0,          # confirmation
-            channel,    # param1: servo number
-            pwm,        # param2: PWM microseconds
-            0, 0, 0, 0, 0  # unused params
-        )
-
-        # Wait for ACK
-        return self.wait_for_command_ack(mavutil.mavlink.MAV_CMD_DO_SET_SERVO, timeout=3)
-        
     def close(self) -> None:
         """
         Closes the MAVLink connection.
@@ -728,46 +690,6 @@ class MatekService:
         if hasattr(self, 'master'):
             self.master.close()
             self.logger.info("MAVLink connection closed")
-
-    def sandbox(self) -> List[Dict[str, float]]:
-        mission = []
-
-        # Zapytaj o misję
-        self.master.mav.mission_request_list_send(self.master.target_system, self.master.target_component)
-
-        msg = self.master.recv_match(type='MISSION_COUNT', blocking=True, timeout=5)
-        if not msg:
-            print("No mission count received")
-            return mission
-
-        count = msg.count
-        print(f"Mission has {count} waypoints")
-
-        for i in range(count):
-            self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, i)
-
-            while True:
-                item = self.master.recv_match(blocking=True, timeout=5)
-                if not item:
-                    print(f"Timeout waiting for waypoint {i}")
-                    return mission
-
-                if item.get_type() in ["MISSION_ITEM", "MISSION_ITEM_INT"]:
-                    mission.append({
-                        "seq": item.seq,
-                        "lat": item.x, #/ 1e7 if hasattr(item, "x") else item.x,
-                        "lon": item.y, #/ 1e7 if hasattr(item, "y") else item.y,
-                        "alt": item.z,
-                        "command": item.command
-                    })
-                    break  # przechodzimy do kolejnego waypointa
-        mission.pop(0)
-        # Odbierz ACK na końcu
-        ack = self.master.recv_match(type='MISSION_ACK', blocking=True, timeout=5)
-        if ack:
-            print(f"Mission download ACK: {ack.type}")
-
-        return mission
 
 '''
 if __name__ == "_main__":      # zamierzone użycie klasy
