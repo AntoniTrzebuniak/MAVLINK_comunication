@@ -540,11 +540,11 @@ class MatekService:
         """
         Gets current mission progress.
 
-        :return: Dict with current_waypoint and total_waypoints, or None if no data
+        return: tuple (current waypoint, total waypoints ammount)
         """
-        current = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=3)
+        current = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=5)
         if current:
-            return current.seq, len(self.get_mission())-1  # pomijamy waypoint home
+            return current.seq
         return None
 
     def wait_for_command_ack(self, command: int, timeout: int = 5) -> bool:
@@ -572,18 +572,18 @@ class MatekService:
         :return: Dict with coordinates, mission_status, mode, and armed status
         """
         coords = self.get_current_coordinates()
-        curr_wp, total_wp = self.get_mission_status()
+        curr_wp = self.get_mission_status()
         mode = self.get_current_mode()
         armed = self.is_armed()
 
         if coords and curr_wp is not None:
             self.logger.info(f"Position: {coords[0]:.6f}, {coords[1]:.6f}, Alt: {coords[2]:.1f}m")
             self.logger.info(
-                f"Mission: {curr_wp}/{total_wp} | Mode: {mode} | Armed: {armed}")
+                f"Mission: {curr_wp} | Mode: {mode} | Armed: {armed}")
 
         return {
             "coordinates": coords,
-            "mission_status": (curr_wp, total_wp),
+            "mission_status": (curr_wp),
             "mode": mode,
             "armed": armed
         }

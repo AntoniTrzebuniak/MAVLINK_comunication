@@ -7,7 +7,7 @@ from picamera2 import Picamera2
 from Application.configuration.config_loader import cfg     # mandatory
 from Application.Logger.log_module import get_logger       
 from Application.Services.MatekService import MatekService
-
+import threading
 
 class CameraService:
     def __init__(self, drone: MatekService):
@@ -28,6 +28,8 @@ class CameraService:
                                     "LensPosition": 0.0,  # 0.0 = Nieskończoność (dioptrie)
                                     "AfRange": 0          # 0 = Normal (opcjonalnie, ogranicza zakres pracy)
                                 })
+
+        self.stop_event = threading.Event()
         
         with open(self.LOG_FILE, 'w', newline='') as f:
             csv.writer(f).writerow(['Filename', 'Index', 'Lat', 'Lon', 'Alt', 'Roll', 'Pitch', 'Yaw'])
@@ -54,4 +56,23 @@ class CameraService:
                 # 2. Zapis precyzyjnych danych z komunikatu
                 with open(self.LOG_FILE, 'a', newline='') as f:
                     csv.writer(f).writerow([filename, img_idx, lat, lon, alt, r, p, y])
+
+    def Testing_function(self):
+        img_idx = 0
+        while True:
+            
+            ts = datetime.now().strftime("%H-%M-%S_%f")
+            img_idx+=1
+            filename = f"IMG_{img_idx:04d}_{ts}.jpg"
+            self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
+            self.logger.info(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
+            lat = 777
+            lon = 666
+            alt = 111       # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
+            r, p, y = 5,10,15
+            
+            # 2. Zapis precyzyjnych danych z komunikatu
+            with open(self.LOG_FILE, 'a', newline='') as f:
+                csv.writer(f).writerow([filename, img_idx, lat, lon, alt, r, p, y])
+            time.sleep(2)
                 
