@@ -193,7 +193,7 @@ class MatekService:
             "param5": 0, "param6": 0, "param7": 0}
 
         
-        command_map = {"WAYPOINT": 16, "SET_SERVO": 183}
+        command_map = {"WAYPOINT": 16, "SET_SERVO": 183, "TAKEOFF": 22}  # Map custom command names to MAVLink command IDs
 
         all_waypoints = [home] + waypoints
         
@@ -273,6 +273,19 @@ class MatekService:
                         wp["channel"],  # param1 = channel
                         wp["pwm"],       # param2 = PWM
                         0, 0, 0, 0, 0    # param3-7 (unused)
+                    )
+                elif cmd == 22:  # TAKEOFF
+                    self.master.mav.mission_item_int_send(
+                        self.master.target_system,
+                        self.master.target_component,
+                        idx_to_send,
+                        mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+                        is_current,
+                        1,
+                        0, 0, 0, 0,
+                        0, 0,
+                        wp["alt"]
                     )
                 # jeśli planujemy ręcznie dodawać inne typy komend do misji, należy je zdefiniować tutaj ręcznie
             
@@ -407,18 +420,16 @@ class MatekService:
             self.logger.error(f"Disarm command failed: {ack.result if ack else 'timeout'}")
             return False
 
-    def set_mode(self, mode_name: str) -> bool:
+    def set_mode(self, mode_name: str, timeout: float = 5.0) -> bool:
         """
         Sets the flight mode (e.g., 'AUTO', 'GUIDED').
-
-        :param mode_name: Flight mode name to set
-        :return: True if mode was set successfully, False otherwise
         """
-        mode_id = self.master.mode_mapping().get(mode_name)
+        mode_mapping = self.master.mode_mapping()
+        mode_id = mode_mapping.get(mode_name)
+
         if mode_id is None:
             self.logger.error(f"Unknown mode: {mode_name}")
-            available_modes = list(self.master.mode_mapping().keys())
-            self.logger.info(f"Available modes: {available_modes}")
+            self.logger.info(f"Available modes: {list(mode_mapping.keys())}")
             return False
 
         self.master.mav.set_mode_send(
@@ -427,15 +438,25 @@ class MatekService:
             mode_id
         )
 
-        # Verify mode change
-        time.sleep(0.5)
-        current_mode = self.get_current_mode()
-        if current_mode == mode_name:
-            self.logger.info(f"Successfully set mode to {mode_name}")
-            return True
-        else:
-            self.logger.warning(f"Mode change failed. Current mode: {current_mode}")
-            return False
+        end_time = time.time() + timeout
+
+        while time.time() < end_time:
+            msg = self._recv_autopilot_message('HEARTBEAT', timeout=0.5)
+            if not msg:
+                continue
+
+            current_mode = "UNKNOWN"
+            for name, mid in mode_mapping.items():
+                if mid == msg.custom_mode:
+                    current_mode = name
+                    break
+
+            if current_mode == mode_name:
+                self.logger.info(f"Successfully set mode to {mode_name}")
+                return True
+
+        self.logger.warning(f"Mode change failed. Current mode: {self.get_current_mode()}")
+        return False
 
     def check_prearm_status(self) -> bool:
         """
