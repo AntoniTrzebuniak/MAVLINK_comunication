@@ -6,6 +6,7 @@ import numpy as np
 from pymavlink import mavutil, mavextra
 from typing import Tuple, List, Dict, Optional
 import cv2
+#import core_math
 
 
 class MissionService:
@@ -166,7 +167,7 @@ class MissionService:
         return top_two
 
 
-    def calc_drop_waypoints(self, trg_dict: dict, container: list) -> List[dict]: 
+    def calc_drop_waypoints2(self, trg_dict: dict, container: list) -> List[dict]: 
         #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające asdfasd
         """
         Oblicza 3 waypointy leżące na linii o zadanym kierunku (yaw, w radianach), 
@@ -198,6 +199,115 @@ class MissionService:
             container.insert(2, {"pwm": MatekService.PWM_DROP_SERVO, "ch": MatekService.RED_CH, "cmd": MatekService.SET_SERVO_CMD})
         else:
             container.insert(2, {"pwm": MatekService.PWM_DROP_SERVO, "ch": MatekService.BLUE_CH, "cmd": MatekService.SET_SERVO_CMD})
+        return container
+
+        
+
+    def calc_release_point(
+        self, 
+        target: dict, 
+        yaw: float, 
+        speed: float, 
+        altitude_agl: float, 
+        solver,  # ShootingSolver instance
+        env # simulation environment instance
+    ) -> dict:
+        """
+        Wyznacza punkt GPS, który wyliczyła symulacja by trafić w cel.
+        
+        Args:
+            target: Słownik z kluczami 'lat', 'lon', 'isRed' reprezentujący cel
+            yaw: Kierunek podejścia w radianach (0 = North, pi/2 = East)
+            speed: Prędkość samolotu w m/s
+            altitude_agl: Wysokość nad celem w metrach (AGL)
+            solver: Instancja klasy ShootingSolver, która ma metodę calculate_release_point()
+        Returns:
+            Słownik z kluczami 'lat', 'lon', 'isRed', 'original_target_lat', 'original_target_lon'
+            reprezentujący punkt GPS do zrzutu oraz informacje o celu.
+        """
+        # skłądowe prędkości w lokalnym ukladzie odniesienia
+        vx = speed * np.cos(yaw)
+        vy = speed * np.sin(yaw)
+        vz = 0.0  # zakładamy lot poziomy
+        approach_velocity = np.array([vx, vy, vz])
+
+        # liczymy od punku (0,0) i potem zamienimy displacement na GPS
+        target_local = np.array([0.0, 0.0])
+        
+        offset_meters = solver.calculate_release_point(
+            target_position=target_local,
+            approach_altitude=altitude_agl,
+            approach_velocity=approach_velocity,
+            env=env
+        )
+        
+        # offset_meters to wektor [north_offset, east_offset] w metrach, który mówi jak daleko od celu (w lokalnym układzie) powinien być punkt zrzutu        
+        # konvertujemy na GPS
+        release_lat, release_lon = mavextra.gps_offset(
+            target["lat"], 
+            target["lon"], 
+            offset_meters[0], 
+            offset_meters[1]  
+        )
+        
+        # Zwracamy punkt zrzutu wraz z informacją o celu (kolor, oryginalne współrzędne) 
+        return {
+            "lat": release_lat,
+            "lon": release_lon,
+            "isRed": target["isRed"],
+            "original_target_lat": target["lat"], 
+            "original_target_lon": target["lon"]
+        }    
+
+    
+    def calc_drop_waypoints(self, drop_point: dict, yaw: float, container: list, isRed: bool, alt=40):
+
+        """
+        drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
+        yaw = kierunek nalotu w radianach
+        """
+
+        dist_and_acr = [
+            (80, 40),   
+            (40, 15),   
+            (0, 5),     
+            (-40, 20)   
+        ]
+        
+
+        for d, acr in dist_and_acr:
+            north = -d * np.cos(yaw)
+            east = -d * np.sin(yaw)
+
+            wp_lat, wp_lon = mavextra.gps_offset(
+                drop_point["lat"],
+                drop_point["lon"],
+                north,
+                east
+            )
+
+            container.append({
+                "command": "WAYPOINT",
+                "lat": wp_lat,
+                "lon": wp_lon,
+                "alt": alt,
+                "acr": acr
+            })
+
+            if d == 0:
+                if isRed :
+                    container.append({
+                        "command": "SET_SERVO",
+                        "channel": PixHawkService.RED_CH,
+                        "pwm": PixHawkService.PWM_DROP_SERVO
+                    })
+                else:
+                    container.append({
+                        "command": "SET_SERVO",
+                        "channel": PixHawkService.BLUE_CH,
+                        "pwm": PixHawkService.PWM_DROP_SERVO
+                    })
+
         return container
 
     @staticmethod
