@@ -298,14 +298,14 @@ class MissionService:
                 if isRed :
                     container.append({
                         "command": "SET_SERVO",
-                        "channel": PixHawkService.RED_CH,
-                        "pwm": PixHawkService.PWM_DROP_SERVO
+                        "channel": MatekService.RED_CH,
+                        "pwm": MatekService.PWM_DROP_SERVO
                     })
                 else:
                     container.append({
                         "command": "SET_SERVO",
-                        "channel": PixHawkService.BLUE_CH,
-                        "pwm": PixHawkService.PWM_DROP_SERVO
+                        "channel": MatekService.BLUE_CH,
+                        "pwm": MatekService.PWM_DROP_SERVO
                     })
 
         return container
