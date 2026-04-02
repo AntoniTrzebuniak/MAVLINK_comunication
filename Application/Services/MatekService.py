@@ -174,7 +174,11 @@ class MatekService:
 		# ardupilot pierwszy punkt traktuje jako Home, dodałem implementację w której automatycznie punkt
 		# zerowy zostaje dodany, nie bierze on udziału w misji
 
-        
+        # Pobieramy aktualny indeks, żeby samolot wiedział gdzie kontynuować
+        current_wp_msg = self.master.recv_match(type='MISSION_CURRENT', blocking=True, timeout=1)
+        current_idx = current_wp_msg.seq if current_wp_msg else 1 # default to 1 if not found
+
+
         home = {"command": 16, "frame": 0, "current": 1, "autocontinue": 1,
             "param1": 0, "param2": 0, "param3": 0, "param4": 0,
             "param5": 0, "param6": 0, "param7": 0}
@@ -183,7 +187,10 @@ class MatekService:
         command_map = {"WAYPOINT": 16, "SET_SERVO": 183}
 
         all_waypoints = [home] + waypoints
-    
+        
+        if current_idx >= len(all_waypoints):
+            current_idx = len(all_waypoints) - 1
+
         self.master.mav.mission_count_send(
             self.master.target_system,
             self.master.target_component,
@@ -193,12 +200,19 @@ class MatekService:
 
         for i, wp in enumerate(all_waypoints):
             # Czekamy na żądanie przesłania waypointa
+            is_current = 1 if i == current_idx else 0
+
             req = self.master.recv_match(type=['MISSION_REQUEST', 'MISSION_REQUEST_INT'], blocking=True, timeout=5)
             if not req:
                 self.logger.warning(f"No mission request received for waypoint {i}")
                 return False
 
             self.logger.info(f"Got request type: {req.get_type()}, seq: {req.seq}")
+            idx_to_send = req.seq
+            wp = all_waypoints[idx_to_send]
+
+            is_current = 1 if idx_to_send == current_idx else 0
+            
             # Obsługa dwóch typów danych wejściowych : 
             # jeśli param5 istnieje, dane pochodzą z mateka
             if "param5" in wp:
@@ -209,7 +223,7 @@ class MatekService:
                     i,
                     wp["frame"],
                     cmd,
-                    wp["current"],
+                    is_current,
                     wp["autocontinue"],
                     wp["param1"],
                     wp["param2"],
@@ -230,7 +244,7 @@ class MatekService:
                         i,
                         mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
                         mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                        1 if i == 0 else 0,
+                        is_current,
                         1,
                         0,
                         wp["acr"],

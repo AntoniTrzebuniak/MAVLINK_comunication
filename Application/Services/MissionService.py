@@ -108,19 +108,15 @@ class MissionService:
                 inside = not inside
         return inside
     
+
     def is_target(self, lat, lon, threshold=5.0):
         """
             Sprawdza, czy (lat, lon) znajduje się w promieniu threshold_meters od celów.
             Modyfikuje self.TRG_CANDIDATES, zwiększając 'count' dla celów within threshold.
         """
-        METERS_PER_DEGREE = 111319.5
-        cos_lat = math.cos(math.radians(lat))
-        meters_per_lon = METERS_PER_DEGREE * cos_lat
-        
         for target in self.TRG_CANDIDATES:
-            dy = (lat - target["lat"]) * METERS_PER_DEGREE
-            dx = (lon - target["lon"]) * meters_per_lon
-            if (dx * dx + dy * dy) <= threshold**2:
+            dist = self.get_distance_meters(lat, lon, target["lat"], target["lon"])
+            if dist <= threshold:
                 return True
         return False
     
@@ -167,15 +163,16 @@ class MissionService:
         return top_two
 
 
-    def calc_drop_waypoints2(self, trg_dict: dict, container: list) -> List[dict]: 
+    def calc_drop_waypoints2(self, trg_dict: dict) -> Tuple(float, float): 
         #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające asdfasd
         """
         Oblicza 3 waypointy leżące na linii o zadanym kierunku (yaw, w radianach), 
 
         Args:
             yaw: kierunek w stopniach (0 = północ, pi/2 = wschód)
+            trg_dict: {"lat": lat, "lon": lon, "isBottle": isBottle}
         Returns: 
-            lista: [(lat1, lon1), (lat2, lon2), (lat3, lon3)]
+            lista: (lat, lon)
         """
         cfg.drops.bottle.x_translation
         cfg.drops.bottle.y_translation
@@ -184,23 +181,37 @@ class MissionService:
         cfg.drops.beacon.y_translation
         cfg.drops.beacon.drop_course
         cfg.drops.altitude
-        
-        dist_and_acr = [(80, 40), (62, 5), (40, 40)]  # (metry przed targetem, ACR)
 
-        # Przesunięcie "przed target" to minus yaw (czyli -yaw)
-        for d, acr in dist_and_acr:
-            # offset w metrach
-            north = -d * np.cos(yaw)
-            east = -d * np.sin(yaw)
-            # użyj mavextra.gps_offset do przeliczenia na lat/lon
-            wp_lat, wp_lon = mavextra.gps_offset(trg_dict["lat"], trg_dict["lon"], north, east)
-            container.append({"lat": wp_lat, "lon": wp_lon, "alt": alt, "acr": acr, "cmd": "NAV"})
-        if trg_dict["isBottle"]:
-            container.insert(2, {"pwm": MatekService.PWM_DROP_SERVO, "ch": MatekService.RED_CH, "cmd": MatekService.SET_SERVO_CMD})
+
+
+    def calc_drop_coords(self, trg_dict: dict) -> Tuple[float, float]:
+        '''
+        Oblicza współrzędne GPS punktu zrzutu na podstawie pozycji celu i kierunku nalotu.
+        '''
+        # 1. Wybór parametrów (bez zmian)
+        if trg_dict.get("isBottle", False):
+            x_trans, y_trans = cfg.drops.bottle.x_translation, cfg.drops.bottle.y_translation
+            course_deg = cfg.drops.bottle.drop_course
         else:
-            container.insert(2, {"pwm": MatekService.PWM_DROP_SERVO, "ch": MatekService.BLUE_CH, "cmd": MatekService.SET_SERVO_CMD})
-        return container
+            x_trans, y_trans = cfg.drops.beacon.x_translation, cfg.drops.beacon.y_translation
+            course_deg = cfg.drops.beacon.drop_course
 
+        lat_center = trg_dict["lat"]
+        lon_center = trg_dict["lon"]
+        yaw_rad = math.radians(course_deg)
+
+        # Obrót współrzędnych (NED)
+        d_north = x_trans * math.cos(yaw_rad) - y_trans * math.sin(yaw_rad)
+        d_east = x_trans * math.sin(yaw_rad) + y_trans * math.cos(yaw_rad)
+
+        # Pobieramy precyzyjne przeliczniki dla tego konkretnego miejsca
+        m_per_lat, m_per_lon = self.get_meters_per_degree(lat_center)
+
+        delta_lat = d_north / m_per_lat
+        delta_lon = d_east / m_per_lon
+
+        return (lat_center + delta_lat, lon_center + delta_lon)
+        
         
 
     def calc_release_point(
@@ -260,7 +271,7 @@ class MissionService:
         }    
 
     
-    def calc_drop_waypoints(self, drop_point: dict, yaw: float, container: list, isRed: bool, alt=40):
+    def calc_drop_waypoints(self, drop_point: dict, container: list, isRed: bool, yaw: float, alt: float = cfg.drops.altitude) -> list:
 
         """
         drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
@@ -309,6 +320,37 @@ class MissionService:
                     })
 
         return container
+    
+    @staticmethod
+    def get_meters_per_degree(lat):
+        """
+        Oblicza dokładną liczbę metrów na stopień szerokości i długości 
+        geograficznej dla danej szerokości (model WGS84).
+        """
+        # Parametry elipsoidy WGS84
+        a = 6378137.0
+        e2 = 0.00669437999014
+        
+        lat_rad = math.radians(lat)
+        sin_lat = math.sin(lat_rad)
+        cos_lat = math.cos(lat_rad)
+        
+        # Promień krzywizny południka (North-South)
+        m_per_lat_rad = (a * (1 - e2)) / (1 - e2 * sin_lat**2)**1.5
+        # Promień krzywizny równoleżnika (East-West)
+        m_per_lon_rad = (a * cos_lat) / math.sqrt(1 - e2 * sin_lat**2)
+        
+        # Konwersja na metry na stopień (z metrów na radian)
+        deg_to_rad = math.pi / 180.0
+        return m_per_lat_rad * deg_to_rad, m_per_lon_rad * deg_to_rad
+    
+    @staticmethod
+    def get_distance_meters(lat1, lon1, lat2, lon2):
+        """Oblicza dystans w metrach między dwoma punktami (uproszczony rzut płaski)."""
+        m_per_lat, m_per_lon = self.get_meters_per_degree(lat1)
+        dy = (lat1 - lat2) * m_per_lat
+        dx = (lon1 - lon2) * m_per_lon
+        return math.sqrt(dx*dx + dy*dy)
 
     @staticmethod
     def load_Poly(filename) -> list[tuple[float, float]]:
