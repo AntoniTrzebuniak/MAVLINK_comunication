@@ -54,6 +54,7 @@ cur_waypoint = drone.get_mission_status()
 container = drone_mission.calc_drop_waypoints(droppoint, yaw=10, container=[], isRed=True)
 new_mission = drone.add_drop_sequence(container)
 drone.append_waypoints(new_mission)
+drone.set_mode("AUTO")
 
 
 
