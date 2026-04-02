@@ -7,7 +7,7 @@ from pymavlink import mavutil, mavextra
 from typing import Tuple, List, Dict, Optional
 import cv2
 #import core_math
-
+import math
 
 class MissionService:
     """
@@ -185,7 +185,7 @@ class MissionService:
 
 
     def calc_drop_coords(self, trg_dict: dict) -> Tuple[float, float]:
-        '''
+        ''' 
         Oblicza współrzędne GPS punktu zrzutu na podstawie pozycji celu i kierunku nalotu.
         '''
         # 1. Wybór parametrów (bez zmian)
@@ -210,7 +210,14 @@ class MissionService:
         delta_lat = d_north / m_per_lat
         delta_lon = d_east / m_per_lon
 
-        return (lat_center + delta_lat, lon_center + delta_lon)
+        return {
+        "lat": lat_center + delta_lat,
+        "lon": lon_center + delta_lon,
+        "isBottle": trg_dict.get("isBottle", False)
+        }
+
+
+        
         
         
 
@@ -271,7 +278,7 @@ class MissionService:
         }    
 
     
-    def calc_drop_waypoints(self, drop_point: dict, container: list, isRed: bool, yaw: float, alt: float = cfg.drops.altitude) -> list:
+    def calc_drop_waypoints(self, drop_point: dict, yaw: float, container: list, alt: float = cfg.drops.altitude) -> list:
 
         """
         drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
@@ -306,7 +313,7 @@ class MissionService:
             })
 
             if d == 0:
-                if isRed :
+                if drop_point.get("isBottle", False): 
                     container.append({
                         "command": "SET_SERVO",
                         "channel": MatekService.RED_CH,

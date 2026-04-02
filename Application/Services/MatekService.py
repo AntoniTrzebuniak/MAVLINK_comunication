@@ -148,7 +148,7 @@ class MatekService:
                     "param7": item.z,
                 })
 
-                """
+                
                 self.logger.debug(
                     f"--- MISSION ITEM {item.seq} ---\n"
                     f"command: {item.command}\n"
@@ -164,7 +164,7 @@ class MatekService:
                     f"param7(z): {item.z}\n"
                     f"----------------------------"
                 )
-                """
+                
 
         return mission
 
@@ -671,7 +671,7 @@ class MatekService:
             mission = mission[:real_idx] + container + mission[real_idx:]
 
         #return self.set_waypoints(mission)
-        return mission
+        return mission[1:]
 
 
     def get_attitude(self, timeout=1):
