@@ -12,11 +12,16 @@ from Application.Logger.log_module import get_logger
 
 
 class MatekService:
+    RED_CH = 5
+    BLUE_CH = 6
+    PWM_DROP_SERVO = 1900
+    
     """
     Example usage:
     # Initialize connection\n
     drone = MatekService()
 
+    
     waypoints = [
         {"lat": -35.363261, "lon": 149.165230, "alt": 20},
         {"lat": -35.363500, "lon": 149.165500, "alt": 25},

@@ -2,9 +2,19 @@
 
 
 
+ 
+
+
+
  # Initialize connection\n
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Initialize connection
 from Application.Services.MatekService import MatekService
 from Application.Services.MissionService import MissionService
+
 
 
 resolution = [1920, 1080]
@@ -37,7 +47,7 @@ droppoint = {"command": "WAYPOINT", "lat": -33.0000, "lon": 149.165230, "alt": 2
 
 mission = drone.get_mission()
 print("Mission read successfully")
-cur_waypoint, waypoint_number = drone.get_mission_status()
+cur_waypoint = drone.get_mission_status()
 
 
 
