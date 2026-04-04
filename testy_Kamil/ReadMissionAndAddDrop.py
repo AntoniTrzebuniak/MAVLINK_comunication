@@ -13,9 +13,8 @@ import math
 """
 
 
-resolution = [1920, 1080]
 drone = MatekService(device="tcp:172.20.10.2:5763")
-drone_mission = MissionService(drone,resolution) 
+drone_mission = MissionService(drone) 
 print("Inicjalizacja programu")
 
 

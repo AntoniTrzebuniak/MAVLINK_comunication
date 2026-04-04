@@ -15,7 +15,7 @@ class MissionService:
         drone: MatekService object instance
         resolution: (width, height)
     """
-    def __init__(self, drone: MatekService, resolution: tuple):
+    def __init__(self, drone: MatekServic):
         self.logger = get_logger(__name__)
         self.image_width, self.image_height = cfg.camera.resolution
 
