@@ -163,27 +163,6 @@ class MissionService:
         return top_two
 
 
-    def calc_drop_waypoints2(self, trg_dict: dict) -> Tuple(float, float): 
-        #TODO do zmiany, należy uwzględniać wiatri nie weim czy 3 wp są wystarczające asdfasd
-        """
-        Oblicza 3 waypointy leżące na linii o zadanym kierunku (yaw, w radianach), 
-
-        Args:
-            yaw: kierunek w stopniach (0 = północ, pi/2 = wschód)
-            trg_dict: {"lat": lat, "lon": lon, "isBottle": isBottle}
-        Returns: 
-            lista: (lat, lon)
-        """
-        cfg.drops.bottle.x_translation
-        cfg.drops.bottle.y_translation
-        cfg.drops.bottle.drop_course
-        cfg.drops.beacon.x_translation
-        cfg.drops.beacon.y_translation
-        cfg.drops.beacon.drop_course
-        cfg.drops.altitude
-
-
-
     def calc_drop_coords(self, trg_dict: dict) -> Tuple[float, float]:
         ''' 
         Oblicza współrzędne GPS punktu zrzutu na podstawie pozycji celu i kierunku nalotu.
@@ -213,13 +192,117 @@ class MissionService:
         return {
         "lat": lat_center + delta_lat,
         "lon": lon_center + delta_lon,
-        "isBottle": trg_dict.get("isBottle", False)
+        "isBottle": trg_dict.get("isBottle")
         }
 
 
+    
+    def calc_drop_waypoints(self, drop_point: dict, yaw: float, container: list = [], alt: float = cfg.drops.altitude) -> list:
+
+        """
+        drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
+        yaw = kierunek nalotu w radianach
+        """
+
+        dist_and_acr = [
+            (80, 15),   
+            (40, 15),   
+            (0, 5),     
+            (-40, 15)   
+        ]
+
+        for d, acr in dist_and_acr:
+            # LOGIKA: 
+            # Jeśli d=80 (przed zrzutem), musimy lecieć w kierunku przeciwnym do yaw (yaw + 180)
+            # Jeśli d=-40 (za zrzutem), lecimy zgodnie z yaw.
+            # Możemy to uprościć: zawsze używamy yaw, ale dystans d określa przesunięcie.
+            # Ale gps_newpos nie lubi ujemnych dystansów, więc:
+            
+            if d >= 0:
+                bearing = (yaw + 180) % 360     # Odsuwamy się do tyłu od punktu zrzutu
+                dist = d
+            else:
+                bearing = yaw                   # Przesuwamy się do przodu za punkt zrzutu
+                dist = abs(d)
+
+            wp_lat, wp_lon = mavextra.gps_newpos(
+                drop_point["lat"],
+                drop_point["lon"],
+                bearing,
+                dist
+            )
+
+            
+            container.append({
+                "command": "WAYPOINT",
+                "lat": wp_lat,
+                "lon": wp_lon,
+                "alt": alt,
+                "acr": acr
+            })
+
+            if d == 0:
+                if drop_point.get("isBottle"): 
+                    container.append({
+                        "command": "SET_SERVO",
+                        "channel": MatekService.RED_CH,
+                        "pwm": MatekService.PWM_DROP_SERVO
+                    })
+                else:
+                    container.append({
+                        "command": "SET_SERVO",
+                        "channel": MatekService.BLUE_CH,
+                        "pwm": MatekService.PWM_DROP_SERVO
+                    })
+
+        return container
+    
+
+    @staticmethod
+    def get_meters_per_degree(lat):
+        """
+        Oblicza dokładną liczbę metrów na stopień szerokości i długości 
+        geograficznej dla danej szerokości (model WGS84).
+        """
+        # Parametry elipsoidy WGS84
+        a = 6378137.0
+        e2 = 0.00669437999014
         
+        lat_rad = math.radians(lat)
+        sin_lat = math.sin(lat_rad)
+        cos_lat = math.cos(lat_rad)
         
+        # Promień krzywizny południka (North-South)
+        m_per_lat_rad = (a * (1 - e2)) / (1 - e2 * sin_lat**2)**1.5
+        # Promień krzywizny równoleżnika (East-West)
+        m_per_lon_rad = (a * cos_lat) / math.sqrt(1 - e2 * sin_lat**2)
         
+        # Konwersja na metry na stopień (z metrów na radian)
+        deg_to_rad = math.pi / 180.0
+        return m_per_lat_rad * deg_to_rad, m_per_lon_rad * deg_to_rad
+    
+    @staticmethod
+    def get_distance_meters(lat1, lon1, lat2, lon2):
+        """Oblicza dystans w metrach między dwoma punktami (uproszczony rzut płaski)."""
+        m_per_lat, m_per_lon = self.get_meters_per_degree(lat1)
+        dy = (lat1 - lat2) * m_per_lat
+        dx = (lon1 - lon2) * m_per_lon
+        return math.sqrt(dx*dx + dy*dy)
+
+    @staticmethod
+    def load_Poly(filename) -> list[tuple[float, float]]:
+        '''
+        Loads polygon vertices from a .poly file
+        
+        Returns:
+            List of (lat, lon) tuples
+        '''
+        polygon = []
+        with open(filename, 'r') as f:
+            for line in f:
+                lat_str, lon_str = line.strip().split(' ')
+                polygon.append((float(lat_str), float(lon_str)))
+        return polygon
 
     def calc_release_point(
         self, 
@@ -276,103 +359,6 @@ class MissionService:
             "original_target_lat": target["lat"], 
             "original_target_lon": target["lon"]
         }    
-
-    
-    def calc_drop_waypoints(self, drop_point: dict, yaw: float, container: list, alt: float = cfg.drops.altitude) -> list:
-
-        """
-        drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
-        yaw = kierunek nalotu w radianach
-        """
-
-        dist_and_acr = [
-            (80, 40),   
-            (40, 15),   
-            (0, 5),     
-            (-40, 20)   
-        ]
-        
-
-        for d, acr in dist_and_acr:
-            north = -d * np.cos(yaw)
-            east = -d * np.sin(yaw)
-
-            wp_lat, wp_lon = mavextra.gps_offset(
-                drop_point["lat"],
-                drop_point["lon"],
-                north,
-                east
-            )
-
-            container.append({
-                "command": "WAYPOINT",
-                "lat": wp_lat,
-                "lon": wp_lon,
-                "alt": alt,
-                "acr": acr
-            })
-
-            if d == 0:
-                if drop_point.get("isBottle", False): 
-                    container.append({
-                        "command": "SET_SERVO",
-                        "channel": MatekService.RED_CH,
-                        "pwm": MatekService.PWM_DROP_SERVO
-                    })
-                else:
-                    container.append({
-                        "command": "SET_SERVO",
-                        "channel": MatekService.BLUE_CH,
-                        "pwm": MatekService.PWM_DROP_SERVO
-                    })
-
-        return container
-    
-    @staticmethod
-    def get_meters_per_degree(lat):
-        """
-        Oblicza dokładną liczbę metrów na stopień szerokości i długości 
-        geograficznej dla danej szerokości (model WGS84).
-        """
-        # Parametry elipsoidy WGS84
-        a = 6378137.0
-        e2 = 0.00669437999014
-        
-        lat_rad = math.radians(lat)
-        sin_lat = math.sin(lat_rad)
-        cos_lat = math.cos(lat_rad)
-        
-        # Promień krzywizny południka (North-South)
-        m_per_lat_rad = (a * (1 - e2)) / (1 - e2 * sin_lat**2)**1.5
-        # Promień krzywizny równoleżnika (East-West)
-        m_per_lon_rad = (a * cos_lat) / math.sqrt(1 - e2 * sin_lat**2)
-        
-        # Konwersja na metry na stopień (z metrów na radian)
-        deg_to_rad = math.pi / 180.0
-        return m_per_lat_rad * deg_to_rad, m_per_lon_rad * deg_to_rad
-    
-    @staticmethod
-    def get_distance_meters(lat1, lon1, lat2, lon2):
-        """Oblicza dystans w metrach między dwoma punktami (uproszczony rzut płaski)."""
-        m_per_lat, m_per_lon = self.get_meters_per_degree(lat1)
-        dy = (lat1 - lat2) * m_per_lat
-        dx = (lon1 - lon2) * m_per_lon
-        return math.sqrt(dx*dx + dy*dy)
-
-    @staticmethod
-    def load_Poly(filename) -> list[tuple[float, float]]:
-        '''
-        Loads polygon vertices from a .poly file
-        
-        Returns:
-            List of (lat, lon) tuples
-        '''
-        polygon = []
-        with open(filename, 'r') as f:
-            for line in f:
-                lat_str, lon_str = line.strip().split(' ')
-                polygon.append((float(lat_str), float(lon_str)))
-        return polygon
 
 
 if __name__ == "__main__":

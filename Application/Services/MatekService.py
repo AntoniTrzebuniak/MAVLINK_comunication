@@ -581,11 +581,11 @@ class MatekService:
             0, 0, 0, 0, 0
         )
 
-    def get_mission_status(self) -> Optional[Dict[str, int]]:
+    def get_mission_status(self) -> int:
         """
         Gets current mission progress.
 
-        return: tuple (current waypoint, total waypoints ammount)
+        returns: Current waypoint index or None if no data 
         """
         current = self._recv_autopilot_message('MISSION_CURRENT', timeout=5)
         if current:
@@ -640,7 +640,7 @@ class MatekService:
         mission = self.get_mission()
 
         if mission:
-            mission = mission[1:] 
+            mission = mission[1:]   
         else :
             mission = []
 
