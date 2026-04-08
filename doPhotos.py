@@ -17,7 +17,6 @@ config["main"]["quality"] = 100
 picam.configure(config)
 
 picam.start()
-picam.set_controls({})
 picam.set_controls({
     "AfMode": 2,          # 0: off (z LensPosition na 0 będzie nieskończoność), 1: Single-shot, 2: Auto - tryb ostrości
     "AfMetering": 0,        # 0: Matrix , 1: Center-weighted, 2: spot - tryb pomiaru ostrości

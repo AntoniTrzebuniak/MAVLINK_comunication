@@ -12,9 +12,9 @@ from Application.Logger.log_module import get_logger
 
 
 class MatekService:
-    RED_CH = 5
-    BLUE_CH = 6
-    PWM_DROP_SERVO = 1900
+    BOTTLE_SERVO_CHANNEL = 8
+    BEACON_SERVO_CHANNEL = 9
+    PWM_DROP_SERVO = 1750
     
     """
     Example usage:
@@ -587,7 +587,7 @@ class MatekService:
 
         returns: Current waypoint index or None if no data 
         """
-        current = self._recv_autopilot_message('MISSION_CURRENT', timeout=5)
+        current = self._recv_autopilot_message('MISSION_CURRENT', timeout=3)
         if current:
             return current.seq
         return None
@@ -701,6 +701,25 @@ class MatekService:
         yaw = msg_att.yaw
         return roll, pitch, yaw
     
+    def set_mission_current_rate(self, hz):
+        """
+        Ustawia częstotliwość odświeżania MISSION_CURRENT
+        hz: częstotliwość w hercach (np. 10 dla 10 razy na sekundę)
+        """
+        # Obliczamy interwał w mikrosekundach
+        interval_us = int(1e6 / hz)
+        
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, # Komenda 511
+            0,                                            # Confirmation
+            42,                                           # ID wiadomości MISSION_CURRENT
+            interval_us,                                  # Interwał w us
+            0, 0, 0, 0,                                   # Nieużywane parametry
+            0                                             # Target (0=wszystkie, 1=tylko ten link)
+        )
+        self.logger.info(f"Zażądano MISSION_CURRENT z częstotliwością {hz}Hz ({interval_us}us)")
 
     def close(self) -> None:
         """

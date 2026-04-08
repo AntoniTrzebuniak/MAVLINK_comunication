@@ -92,7 +92,7 @@ class MissionService:
         print("detected point", lat_t, lon_t)
         return lat_t, lon_t
 
-    def isinPolygon(lat, lon, Polygon: List[Tuple[float, float]]) -> bool:
+    def isinPolygon(self, lat, lon, Polygon: List[Tuple[float, float]]) -> bool:
         '''
            Polygon: List of (lat, lon) tuples defining the vertices of the polygon in order!!!
         '''
@@ -123,7 +123,7 @@ class MissionService:
     def insert_target(self, lat, lon, isBottle: bool):
         self.TRG_CANDIDATES.append({"lat": lat, "lon": lon, "count": 1, "isBottle": isBottle})
 
-    def process_target(self, pixel, isBottle: bool)-> bool:
+    def process_target(self, pixel, isBottle: bool, search_zone)-> bool:
         msg_gps = self.drone.get_current_coordinates()
         if msg_gps is None:
             return None
@@ -200,12 +200,20 @@ class MissionService:
     def calc_drop_waypoints(self, drop_point: dict, yaw: float, container: list = [], alt: float = cfg.drops.altitude) -> list:
 
         """
-        drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
-        yaw = kierunek nalotu w radianach
+        Args: 
+            drop_point['lat'], drop_point['lon'] = punkt, w którym ma otworzyć się serwo
+            yaw = kierunek nalotu w radianach
+            container = [{
+                "command": "WAYPOINT",
+                "lat": wp_lat,
+                "lon": wp_lon,
+                "alt": alt,
+                "acr": acr
+            }]
         """
 
         dist_and_acr = [
-            (80, 15),   
+            (100, 15),   
             (40, 15),   
             (0, 5),     
             (-40, 15)   
@@ -245,17 +253,19 @@ class MissionService:
                 if drop_point.get("isBottle"): 
                     container.append({
                         "command": "SET_SERVO",
-                        "channel": MatekService.RED_CH,
+                        "channel": MatekService.BOTTLE_SERVO_CHANNEL,
                         "pwm": MatekService.PWM_DROP_SERVO
                     })
                 else:
                     container.append({
                         "command": "SET_SERVO",
-                        "channel": MatekService.BLUE_CH,
+                        "channel": MatekService.BEACON_SERVO_CHANNEL,
                         "pwm": MatekService.PWM_DROP_SERVO
                     })
 
         return container
+
+    
     
 
     @staticmethod
@@ -300,7 +310,10 @@ class MissionService:
         polygon = []
         with open(filename, 'r') as f:
             for line in f:
-                lat_str, lon_str = line.strip().split(' ')
+                line = line.strip()
+                if line.startswith('#') or not line:
+                    continue
+                lat_str, lon_str = line.split(' ')
                 polygon.append((float(lat_str), float(lon_str)))
         return polygon
 

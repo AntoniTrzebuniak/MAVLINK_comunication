@@ -1,7 +1,11 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import threading
 import time
 from Application.Services.MatekService import MatekService
-from Application.Services.CameraService import CameraService # Załóżmy, że tam zapisałeś klasę
+from Application.Services.CameraService import CameraService 
 from Application.configuration.config_loader import cfg
 from Application.Logger.log_module import get_logger
 
@@ -21,9 +25,9 @@ while True:
     print(f"Current waypoint: {curr_wp}")
     
 
-    if curr_wp == 5 and not Mapping_started_flag:
+    if curr_wp == 3 and not Mapping_started_flag:
         Mapping_started_flag = True
-        logger.info("Reached waypoint {curr_wp}, starting mapping")
+        logger.info(f"Reached waypoint {curr_wp}, starting mapping")
         camera_thread = threading.Thread(
                 target=camera.Testing_function, 
                 daemon=True

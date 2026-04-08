@@ -15,36 +15,76 @@ from Application import configuration
 import math
 """
 
-
-drone = MatekService(device="tcp:192.168.0.111:5763")
+drone = MatekService(device="tcp:192.168.0.109:5763")
 planner = MissionService(drone) 
 print("Inicjalizacja programu")
 logger = get_logger(__name__)
-
 waypoints = drone.get_mission()
+poligon = planner.load_Poly(cfg.dirs.zones_dir / "Sloszowa_target_detection_1.poly")
+if poligon is None:
+    logger.error("Nie można wczytać poligonu. Sprawdź ścieżkę i format pliku.")
 
-target = {"command": "WAYPOINT", "lat": 50.2843899, "lon": 19.7213602, "alt": 20, "acr": 0}
-drop_point = planner.calc_drop_coords(target)
+# ++++++++++++++ 1 cel ++++++++++++++
+target1 = {"command": "WAYPOINT", "lat": 50.2844310, "lon": 19.7209096, "isBottle": True}
+drop_point1 = planner.calc_drop_coords(target1)
+lap2 = []
+lap2.append({"command": "WAYPOINT", "lat": 50.2853702, "lon": 19.7223687, "alt": 80, "acr": 15})
+lap2.append({"command": "WAYPOINT", "lat": 50.2822749, "lon": 19.7217625, "alt": 60, "acr": 15})
+lap2.append({"command": "WAYPOINT", "lat": 50.2825903, "lon": 19.7204214, "alt": 60, "acr": 15})
+b1 = planner.isinPolygon(target1['lat'], target1['lon'], poligon)
+if b1 == False:
+    logger.warning("cel poza strefą")
 
-#Założenie : waypointy zostają dodane w mission planerze. Wykonane zostaje jedno kółko w celu zidentyfikowania celu. Następnie 
-# misja zostaje skopiowana i dodana na koniec obecnej misji wraz z sekwencją zrzutu.
+# ++++++++++++++ 2 cel ++++++++++++++
+target2 = {"command": "WAYPOINT", "lat": 50.2847943, "lon": 19.7201586, "isBottle": False}
+drop_point2 = planner.calc_drop_coords(target2)
 
-#yaw = math.radians(cfg.drops.bottle.drop_course)
+lap3 = []
+lap3.append({"command": "WAYPOINT", "lat": 50.2853702, "lon": 19.7223687, "alt": 60, "acr": 15})
+lap3.append({"command": "WAYPOINT", "lat": 50.2822749, "lon": 19.7217625, "alt": 60, "acr": 15})
+lap3.append({"command": "WAYPOINT", "lat": 50.2825903, "lon": 19.7204214, "alt": 60, "acr": 15})
+b1 = planner.isinPolygon(target2['lat'], target2['lon'], poligon)
+if b1 == False:
+    logger.warning("cel poza strefą")
+
 
 flag1 = False
+flag2 = False
+
 while True:
     idx = drone.get_mission_status()
     logger.info(f"Current WP: {idx}")
+
     if idx == 5 and not flag1:
         flag1 = True
-        container = planner.calc_drop_waypoints(
-            drop_point=drop_point,
+
+        lap2 = planner.calc_drop_waypoints(
+            drop_point=drop_point1,
             yaw=10,
-            container=[]
+            container=lap2
         )
-
-        new_mission = drone.add_drop_sequence(container)
-        drone.append_waypoints(new_mission)
+        lap2.append({"command": "WAYPOINT", "lat": 50.2855004, "lon": 19.7208774, "alt": 60, "acr": 15})
+        new_mission = drone.append_waypoints(lap2)
         drone.set_mode("AUTO")
+        if new_mission:
+            logger.info(f"Added {len(lap2)} waypoints successfully: \n{lap2}")
+        else:
+            logger.error("Failed to add waypoints for target 1.")
 
-s
+
+    if idx == 13 and not flag2:
+        flag2 = True
+
+        lap3 = planner.calc_drop_waypoints(
+            drop_point=drop_point2,
+            yaw=10,
+            container=lap3
+        )
+        lap3.append({"command": "WAYPOINT", "lat": 50.2855004, "lon": 19.7208774, "alt": 60, "acr": 15})
+        new_mission = drone.append_waypoints(lap3)
+        drone.set_mode("AUTO")
+        if new_mission:
+            logger.info(f"Added {len(lap3)} waypoints successfully: \n{lap3}")
+        else:
+            logger.error("Failed to add waypoints for target 2.")
+

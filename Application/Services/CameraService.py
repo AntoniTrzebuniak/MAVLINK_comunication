@@ -17,9 +17,10 @@ class CameraService:
         os.makedirs(self.PHOTOS_MISSION_DIR, exist_ok=True)
         self.LOG_FILE = self.PHOTOS_MISSION_DIR / 'photos_position.csv'
         self.drone = drone
-
+        self.resolution = cfg.camera.resolution
+        
         self.picam = Picamera2()
-        config = self.picam.create_still_configuration(main={"size": (2304, 1296)})
+        config = self.picam.create_still_configuration(main={"size": self.resolution})
         config["main"]["quality"] = 100
         self.picam.configure(config)
         self.picam.start()
@@ -39,23 +40,54 @@ class CameraService:
         Nasłuchuje komunikatów CAMERA_FEEDBACK i reaguje na nie, wykonując zdjęcia i zapisując dane.
         Ten kod powinien być uruchomiony w osobnym wątku lub procesie, aby nie blokować głównej logiki drona.
         """
+        log_file = open(self.LOG_FILE, 'a', newline='')
         while True:
             msg = self.drone.master.recv_match(type='CAMERA_FEEDBACK', blocking=True)   # 'TERRAIN_REPORT'
             
             if msg:
-                ts = datetime.now().strftime("%H-%M-%S_%f")
-                img_idx = msg.img_idx
-                filename = f"IMG_{img_idx:04d}_{ts}.jpg"
-                self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
-                self.logger.info(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
-                lat = msg.lat / 1e7
-                lon = msg.lng / 1e7
-                alt = msg.alt_msl        # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
-                r, p, y = msg.roll, msg.pitch, msg.yaw
-                
-                # 2. Zapis precyzyjnych danych z komunikatu
-                with open(self.LOG_FILE, 'a', newline='') as f:
-                    csv.writer(f).writerow([filename, img_idx, lat, lon, alt, r, p, y])
+                self.image_capture(log_file, msg)
+
+    def image_capture(self, f_handle, msg):
+        '''
+        Args:
+            f_handle: uchwyt do otwartego pliku CSV, gdzie będą zapisywane dane
+            msg: komunikat CAMERA_FEEDBACK z danymi o zdjęciu i pozycji
+        '''
+        ts = datetime.now().strftime("%m-%d_%H:%M:%S:%f")[:-3]
+        img_idx = msg.img_idx
+        filename = f"IMG_{img_idx:04d}_{ts}.jpg"
+        self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
+        self.logger.info(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
+        lat = msg.lat / 1e7
+        lon = msg.lng / 1e7
+        alt = msg.alt_msl        # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
+        r, p, y = msg.roll, msg.pitch, msg.yaw
+        
+        # 2. Zapis precyzyjnych danych z komunikatu
+        csv.writer(f_handle).writerow([filename, img_idx, lat, lon, alt, r, p, y])
+    
+    @staticmethod
+    def image_capture_test(f_handle, msg):
+        '''
+        Mimics working if image capture for testing, use only on Earth
+        Args:
+            f_handle: uchwyt do otwartego pliku CSV, gdzie będą zapisywane dane
+            msg: komunikat CAMERA_FEEDBACK z danymi o zdjęciu i pozycji
+        '''
+        ts = datetime.now().strftime("%m-%d_%H:%M:%S:%f")[:-3]
+        img_idx = msg.img_idx
+        filename = f"IMG_{img_idx:04d}_{ts}.jpg"
+        #self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
+        print(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
+        lat = msg.lat / 1e7
+        lon = msg.lng / 1e7
+        alt = msg.alt_msl        # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
+        r, p, y = msg.roll, msg.pitch, msg.yaw
+        
+        # 2. Zapis precyzyjnych danych z komunikatu
+        csv.writer(f_handle).writerow([filename, img_idx, lat, lon, alt, r, p, y])
+
+
 
     def Testing_function(self):
         img_idx = 0
