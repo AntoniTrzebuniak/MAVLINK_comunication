@@ -15,7 +15,7 @@ from Application import configuration
 import math
 """
 
-drone = MatekService(device="tcp:192.168.0.109:5763")
+drone = MatekService(device="tcp:192.168.0.186:5763")
 planner = MissionService(drone) 
 print("Inicjalizacja programu")
 logger = get_logger(__name__)

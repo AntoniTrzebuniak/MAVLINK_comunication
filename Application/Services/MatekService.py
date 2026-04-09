@@ -70,7 +70,7 @@ class MatekService:
             self.logger.exception("Connection failed: %s", e)
             raise
 
-    def _recv_autopilot_message(self, msg_type, timeout=5):
+    def _recv_autopilot_message(self, msg_type: string, timeout=5):
         end_time = time.time() + timeout
 
         while time.time() < end_time:

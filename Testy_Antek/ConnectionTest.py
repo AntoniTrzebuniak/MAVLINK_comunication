@@ -9,5 +9,6 @@ from Application.configuration.config_loader import cfg
 #print(cfg.mav.baud)
 #drone = MatekService(device = cfg.mav.device, baud = cfg.mav.baud)
 
-drone = MatekService(device = "tcp:192.168.0.109:5763")
+drone = MatekService(device = "tcp:192.168.0.186:5764")     #192.168.0.186
 print("Connected to drone")
+

@@ -41,7 +41,7 @@ while True:
             if msg:
                 print(f"Received CAMERA_FEEDBACK message: img_idx={msg.img_idx}")
                 CameraService.image_capture_test(log_file, msg)
-
+    
 
 
 
