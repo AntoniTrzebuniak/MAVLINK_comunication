@@ -772,7 +772,76 @@ def rot_matrix(roll, pitch, yaw):
                     [0, 0, 1]])
         return Rz @ Ry @ Rx
 
+def monitor_all(self, update_interval: int = 2) -> None:
+    """
+    Monitors mission progress in real-time.
+    Call this in a loop to track mission status.
+    """
+    
+ 
+    coords  = self.get_current_coordinates()
+    curr_wp = self.get_mission_status()
+    mode    = self.get_current_mode()
+    armed   = self.is_armed()
+    mission = self.get_mission()
+    attitude = self.get_attitude()
+    reached = self.master.recv_match(type='MISSION_ITEM_REACHED', blocking=False)
+    wind_msg = self._recv_autopilot_message('WIND', timeout=2)
+    
+    if reached:
+        self.logger.info(f"MISSION_ITEM_REACHED: seq={reached.seq}")
 
+
+    gps_msg = self._recv_autopilot_message('GPS_RAW_INT', timeout=2)
+    bat_msg = self._recv_autopilot_message('SYS_STATUS', timeout=2)
+    servo_msg = self._recv_autopilot_message('SERVO_OUTPUT_RAW', timeout=2)
+
+
+    if coords:
+        self.logger.info(
+            f"Position: {coords[0]:.6f}, {coords[1]:.6f}, Alt: {coords[2]:.1f}m"
+        )
+    else:
+        self.logger.info("Position: brak danych")
+ 
+    self.logger.info(
+        f"Mission: WP={curr_wp} | Mode: {mode} | Armed: {armed}"
+    )
+ 
+    if attitude:
+        self.logger.info(
+            f"Attitude: roll={math.degrees(attitude[0]):.1f}°  "
+            f"pitch={math.degrees(attitude[1]):.1f}°  "
+            f"yaw={math.degrees(attitude[2]):.1f}°"
+        )
+    else:
+        self.logger.warning("Attitude: brak danych")
+ 
+ 
+    if bat_msg:
+        voltage   = bat_msg.voltage_battery / 1000.0
+        current   = bat_msg.current_battery / 100.0
+        remaining = bat_msg.battery_remaining
+        cur_str   = f"{current:.1f}A"   if bat_msg.current_battery != -1 else "N/A"
+        rem_str   = f"{remaining}%"     if remaining != -1              else "N/A"
+        self.logger.info(
+            f"Battery: {voltage:.2f}V | {cur_str} | remaining: {rem_str}"
+        )
+    else:
+        self.logger.warning("Battery: brak danych") 
+
+    if servo_msg:
+    self.logger.info(
+        f"Servo: ch8={servo_msg.servo4_raw} "
+        f"ch9={servo_msg.servo3_raw}"
+    )
+
+    if wind_msg:
+        self.logger.info(
+            f"Wind: direction={wind_msg.direction:.1f}°  speed={wind_msg.speed:.1f}m/s"
+    )
+    else:
+        self.logger.warning("Wind: brak danych")
 
 
 if __name__ == "__main__":
