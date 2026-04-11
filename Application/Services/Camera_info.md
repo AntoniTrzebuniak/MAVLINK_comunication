@@ -15,3 +15,35 @@
 | **1**       | **Macro**  | Skupia się na obiektach bardzo bliskich (kilka-kilkanaście cm).                        |
 | **2**       | **Full**   | Przeszukuje cały dostępny zakres (od Macro do Nieskończoności).                        |
 
+# Troubleshooting
+
+1. Sprawdź stan portu (Komenda diagnostyczna)
+Wpisz poniższą komendę, aby sprawdzić, czy system w ogóle widzi cokolwiek na magistrali I2C (tam, gdzie "rozmawia" z kamerą):
+
+``` {Bash}
+ls /dev/i2c-*
+```
+
+Następnie sprawdź, czy sterownik jest w ogóle dostępny w systemie:
+
+``` {Bash}
+lsmod | grep imx708
+```
+
+2. Sprawdź plik konfiguracyjny
+
+sudo vim /boot/firmware/config.txt
+
+Powinno być:
+
+camera_auto_detect=1
+
+Opcjonalnie można dopisać:
+dtoverlay=imx708
+
+lub 
+dtoverlay=imx708,cam0 # cam0 oznacza fizyczne miejsce wpięcia kamery, może być cam1
+
+3. Sprzwdzić dostępne kamery
+
+rpicam-hello --list-cameras

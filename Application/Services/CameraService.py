@@ -75,14 +75,14 @@ class CameraService:
             msg: komunikat CAMERA_FEEDBACK z danymi o zdjęciu i pozycji
         '''
         ts = datetime.now().strftime("%m-%d_%H:%M:%S:%f")[:-3]
-        img_idx = msg.img_idx
+        img_idx = 1#msg.img_idx
         filename = f"IMG_{img_idx:04d}_{ts}.jpg"
         #self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
         print(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
-        lat = msg.lat / 1e7
-        lon = msg.lng / 1e7
-        alt = msg.alt_msl        # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
-        r, p, y = msg.roll, msg.pitch, msg.yaw
+        lat = 1#msg.lat / 1e7
+        lon = 1#msg.lng / 1e7
+        alt = 1#msg.alt_msl        # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
+        r, p, y = 2,2,2#msg.roll, msg.pitch, msg.yaw
         
         # 2. Zapis precyzyjnych danych z komunikatu
         csv.writer(f_handle).writerow([filename, img_idx, lat, lon, alt, r, p, y])
