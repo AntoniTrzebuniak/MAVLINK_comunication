@@ -1,5 +1,6 @@
 [mavlink]
 device = "/dev/ttyAMA2"
+device2 = "/dev/ttyAMA3"
 baud = 115200
 mav_version = 2
 

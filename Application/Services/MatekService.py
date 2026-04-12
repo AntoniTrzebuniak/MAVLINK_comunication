@@ -702,7 +702,7 @@ class MatekService:
         return roll, pitch, yaw
     
     def monitor_all(self, update_interval: int = 2) -> None:
-    """
+        """
         Monitors mission progress in real-time.
         Call this in a loop to track mission status.
         """
@@ -760,15 +760,15 @@ class MatekService:
             self.logger.warning("Battery: brak danych") 
 
         if servo_msg:
-        self.logger.info(
-            f"Servo: ch8={servo_msg.servo4_raw} "
-            f"ch9={servo_msg.servo3_raw}"
-        )
+            self.logger.info(
+                f"Servo: ch8={servo_msg.servo4_raw} "
+                f"ch9={servo_msg.servo3_raw}"
+            )
 
         if wind_msg:
             self.logger.info(
                 f"Wind: direction={wind_msg.direction:.1f}°  speed={wind_msg.speed:.1f}m/s"
-        )
+            )
         else:
             self.logger.warning("Wind: brak danych")
 

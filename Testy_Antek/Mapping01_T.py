@@ -26,12 +26,11 @@ camera = CameraService(drone=drone)
 drone.set_mission_current_rate(10)
 
 Mapping_started_flag = False
-curr_wp=0
 
 while True:
-    #curr_wp = drone.get_mission_status()
+    curr_wp = drone.get_mission_status()
     print(f"Current waypoint: {curr_wp}")
-    curr_wp+=1
+
     if curr_wp == 5 and not Mapping_started_flag:
         Mapping_started_flag = True
         logger.info(f"Reached waypoint {curr_wp}, starting mapping")
@@ -41,7 +40,7 @@ while True:
         while True:
             msg = drone.master.recv_match(type='CAMERA_FEEDBACK', blocking=True)   # 'TERRAIN_REPORT'
             if msg:
-                print(f"Received CAMERA_FEEDBACK message: img_idx={msg.img_idx}")
+                logger.info(f"Received CAMERA_FEEDBACK message: img_idx={msg.img_idx}")
                 camera.image_capture(log_file, msg)
 
             

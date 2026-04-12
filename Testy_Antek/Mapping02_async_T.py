@@ -8,11 +8,15 @@ from Application.Services.MatekService import MatekService
 from Application.Services.CameraService import CameraService 
 from Application.configuration.config_loader import cfg
 from Application.Logger.log_module import get_logger
+from Application.Services.MissionService import MissionService
 
 
-drone = MatekService(device="tcp:192.168.0.186:5763")
+drone = MatekService(device = cfg.mav.device, baud = cfg.mav.baud)
 camera = CameraService(drone=drone)
+planner = MissionService(drone) 
 logger = get_logger(__name__)
+drone.set_mission_current_rate(10)
+
 
 camera_thread = None
 
@@ -25,23 +29,34 @@ while True:
     print(f"Current waypoint: {curr_wp}")
     
 
-    if curr_wp == 3 and not Mapping_started_flag:
+    if curr_wp == 5 and not Mapping_started_flag:
         Mapping_started_flag = True
         logger.info(f"Reached waypoint {curr_wp}, starting mapping")
         camera_thread = threading.Thread(
-                target=camera.Testing_function, 
+                target=camera.MappingListener, 
                 daemon=True
                 )
-        '''camera_thread = threading.Thread(
-                target=camera.image_capture_listener, 
-                daemon=True
-                )'''
         camera_thread.start()
 
-    if curr_wp >= 116:
+    if curr_wp >= 96:
         logger.info(f"Reached waypoint {curr_wp}, stopping mapping")
         camera.stop_event.set()     # zamykanie wątku
         camera_thread = None
+        Mapping_started_flag = False
+    
+
+'''
+def droppoint_pipeline():
+    target1 = {"command": "WAYPOINT", "lat": 50.2844310, "lon": 19.7209096, "isBottle": True}
+    drop_point1 = planner.calc_drop_coords(target1)
 
 
+    new_mission = drone.append_waypoints(lap2)
+    drone.set_mode("AUTO")
+    if new_mission:
+        logger.info(f"Added {len(lap2)} waypoints successfully: \n{lap2}")
+    else:
+        logger.error("Failed to add waypoints for target 1.")
+
+'''
 

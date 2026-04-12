@@ -1,7 +1,7 @@
 import serial  
 import time  
 ser = serial.Serial(  
- port='/dev/ttyAMA2',  
+ port='/dev/ttyAMA3',  
  baudrate=115200,  
  bytesize=serial.EIGHTBITS,  
  parity=serial.PARITY_NONE,  

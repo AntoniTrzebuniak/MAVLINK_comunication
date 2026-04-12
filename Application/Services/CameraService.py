@@ -10,15 +10,18 @@ from Application.Services.MatekService import MatekService
 import threading
 
 class CameraService:
-    def __init__(self, drone: MatekService):
+    def __init__(self, drone: MatekService = None):
         self.logger = get_logger(__name__)
         self.PHOTOS_DIR = cfg.dirs.photos_dir
         self.PHOTOS_MISSION_DIR = self.PHOTOS_DIR / f"mission_{datetime.now().strftime('Mission_%Y-%m-%d_%H-%M')}"
         os.makedirs(self.PHOTOS_MISSION_DIR, exist_ok=True)
         self.LOG_FILE = self.PHOTOS_MISSION_DIR / 'photos_position.csv'
-        self.drone = drone
         self.resolution = cfg.camera.resolution
-        
+        if drone is None:
+            self.drone = MatekService(device = "/dev/ttyAMA3", baud = cfg.mav.baud)     #TODO zmień to w uj
+        else:
+            self.drone = drone
+
         self.picam = Picamera2()
         config = self.picam.create_still_configuration(main={"size": self.resolution})
         config["main"]["quality"] = 100
@@ -43,7 +46,6 @@ class CameraService:
         log_file = open(self.LOG_FILE, 'a', newline='')
         while True:
             msg = self.drone.master.recv_match(type='CAMERA_FEEDBACK', blocking=True)   # 'TERRAIN_REPORT'
-            
             if msg:
                 self.image_capture(log_file, msg)
 
@@ -88,23 +90,14 @@ class CameraService:
         csv.writer(f_handle).writerow([filename, img_idx, lat, lon, alt, r, p, y])
 
 
+    def MappingListener(self):        
+        logger = get_logger("MappingListener")
+        with open(self.LOG_FILE, 'a', newline='') as log_file:
+            while not self.stop_event.is_set():    
+                msg = self.drone.master.recv_match(type='CAMERA_FEEDBACK', blocking=True)   # 'TERRAIN_REPORT'
+                if msg:
+                    logger.info(f"Received CAMERA_FEEDBACK message: img_idx={msg.img_idx}")
+                    self.image_capture(log_file, msg)
 
-    def Testing_function(self):
-        img_idx = 0
-        while True:
-            
-            ts = datetime.now().strftime("%H-%M-%S_%f")
-            img_idx+=1
-            filename = f"IMG_{img_idx:04d}_{ts}.jpg"
-            self.picam.capture_file(self.PHOTOS_MISSION_DIR/filename)
-            self.logger.info(f"Zrobiono zdjęcie: {filename} (img_idx={img_idx})")
-            lat = 777
-            lon = 666
-            alt = 111       # Wysokość n.p.m. (lub relatywna, zależnie od ustawień)
-            r, p, y = 5,10,15
-            
-            # 2. Zapis precyzyjnych danych z komunikatu
-            with open(self.LOG_FILE, 'a', newline='') as f:
-                csv.writer(f).writerow([filename, img_idx, lat, lon, alt, r, p, y])
-            time.sleep(2)
+
                 
