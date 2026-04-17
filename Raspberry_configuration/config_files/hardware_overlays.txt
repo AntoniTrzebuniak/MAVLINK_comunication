@@ -1,0 +1,6 @@
+dtoverlay=imx708,cam0
+dtoverlay=vc4-kms-v3d
+dtoverlay=dwc2,dr_mode=host
+dtoverlay=disable-bt
+dtoverlay=uart2
+dtoverlay=uart3

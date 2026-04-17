@@ -15,6 +15,7 @@ dtparam=audio=on
 
 # Automatically load overlays for detected cameras
 camera_auto_detect=1
+dtoverlay=imx708,cam0
 
 # Automatically load overlays for detected DSI displays
 display_auto_detect=1
@@ -53,3 +54,4 @@ dtparam=uart0=on
 enable_uart=1
 dtoverlay=disable-bt
 dtoverlay=uart2
+dtoverlay=uart3

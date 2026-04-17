@@ -14,6 +14,7 @@ build-essential
 ca-certificates
 cifs-utils
 cloud-init
+code
 console-setup
 coreutils
 cpio
@@ -47,6 +48,12 @@ gcc-14-base
 gdb
 gpiod
 grep
+gstreamer1.0-libcamera
+gstreamer1.0-plugins-bad
+gstreamer1.0-plugins-base
+gstreamer1.0-plugins-good
+gstreamer1.0-plugins-ugly
+gstreamer1.0-tools
 gzip
 hostname
 htop
@@ -71,6 +78,7 @@ libbsd0
 libbz2-1.0
 libc-bin
 libc6
+libcap-dev
 libcap-ng0
 libcap2
 libcap2-bin
@@ -85,6 +93,7 @@ libfdisk1
 libgcc-s1
 libgmp10
 libgssapi-krb5-2
+libgstreamer1.0-dev
 libhogweed6t64
 libidn2-0
 libjansson4
