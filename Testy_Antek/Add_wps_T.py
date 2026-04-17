@@ -25,27 +25,27 @@ if poligon is None:
     logger.error("Nie można wczytać poligonu. Sprawdź ścieżkę i format pliku.")
 
 # ++++++++++++++ 1 cel ++++++++++++++
-target1 = {"command": "WAYPOINT", "lat": 50.2844310, "lon": 19.7209096, "isBottle": True}
+target1 = {"command": "WAYPOINT", "lat": 50.284714, "lon": 19.720407, "isBottle": False}
 drop_point1 = planner.calc_drop_coords(target1)
 lap2 = []
 lap2.append({"command": "WAYPOINT", "lat": 50.2853702, "lon": 19.7223687, "alt": 80, "acr": 15})
 lap2.append({"command": "WAYPOINT", "lat": 50.2822749, "lon": 19.7217625, "alt": 60, "acr": 15})
 lap2.append({"command": "WAYPOINT", "lat": 50.2825903, "lon": 19.7204214, "alt": 60, "acr": 15})
-b1 = planner.isinPolygon(target1['lat'], target1['lon'], poligon)
-if b1 == False:
-    logger.warning("cel poza strefą")
+#b1 = planner.isinPolygon(target1['lat'], target1['lon'], poligon)
+#if b1 == False:
+#    logger.warning("cel poza strefą")
 
 # ++++++++++++++ 2 cel ++++++++++++++
-target2 = {"command": "WAYPOINT", "lat": 50.2847943, "lon": 19.7201586, "isBottle": False}
+target2 = {"command": "WAYPOINT", "lat": 50.284714, "lon": 19.720407, "isBottle": False}
 drop_point2 = planner.calc_drop_coords(target2)
 
 lap3 = []
 lap3.append({"command": "WAYPOINT", "lat": 50.2853702, "lon": 19.7223687, "alt": 60, "acr": 15})
 lap3.append({"command": "WAYPOINT", "lat": 50.2822749, "lon": 19.7217625, "alt": 60, "acr": 15})
 lap3.append({"command": "WAYPOINT", "lat": 50.2825903, "lon": 19.7204214, "alt": 60, "acr": 15})
-b1 = planner.isinPolygon(target2['lat'], target2['lon'], poligon)
-if b1 == False:
-    logger.warning("cel poza strefą")
+#b1 = planner.isinPolygon(target2['lat'], target2['lon'], poligon)
+#if b1 == False:
+#    logger.warning("cel poza strefą")
 
 
 flag1 = False
@@ -55,7 +55,6 @@ print(f"kierunek zrzutu: {yaw}")
 while True:
     idx = drone.get_mission_status()
     logger.info(f"Current WP: {idx}")
-    idx = 13
     if idx == 5 and not flag1:
         flag1 = True
 
@@ -72,7 +71,7 @@ while True:
         else:
             logger.error("Failed to add waypoints for target 1.")
 
-
+'''
     if idx == 13 and not flag2:
         flag2 = True
 
@@ -89,3 +88,4 @@ while True:
         else:
             logger.error("Failed to add waypoints for target 2.")
 
+'''

@@ -5,16 +5,16 @@ from typing import Any, Tuple, List, Dict, Optional
 import numpy as np
 #from pyproj import Transformer, CRS
 #import cv2
-from math import radians
+import math
 
 from Application.configuration.config_loader import cfg     # Mandatory
 from Application.Logger.log_module import get_logger
 
 
 class MatekService:
-    BOTTLE_SERVO_CHANNEL = 8
-    BEACON_SERVO_CHANNEL = 9
-    PWM_DROP_SERVO = 1750
+    BOTTLE_SERVO_CHANNEL = 9
+    BEACON_SERVO_CHANNEL = 8
+    PWM_DROP_SERVO = 800
     
     """
     Example usage:

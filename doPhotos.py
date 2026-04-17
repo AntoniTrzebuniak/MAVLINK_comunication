@@ -20,7 +20,7 @@ picam.start()
 picam.set_controls({
     "AfMode": 2,          # 0: off (z LensPosition na 0 będzie nieskończoność), 1: Single-shot, 2: Auto - tryb ostrości
     "AfMetering": 0,        # 0: Matrix , 1: Center-weighted, 2: spot - tryb pomiaru ostrości
-    "ExposureTime": 10000,   # 1000us = 1/1000s (idealne dla drona)
+    "ExposureTime": 500,   # 1000us = 1/1000s (idealne dla drona)
     "AfRange": 1   
     #"AnalogueGain": 2.0     # Odpowiednik ISO (zwiększ, jeśli zdjęcia są za ciemne)
 })
