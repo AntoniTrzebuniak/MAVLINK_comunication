@@ -65,6 +65,22 @@ else
     echo "Błąd: Brak pliku user_groups.txt"
 fi
 
+echo "--- 6. Konfiguracja sieci wifi ---"
+
+TEMP_SSID="PapieskiWifi"
+TEMP_PASSWORD="213769420"
+sudo nmcli dev wifi connect "$TEMP_SSID" password "$TEMP_PASSWORD"
+sudo nmcli connection modify "PapieskiWifi" connection.autoconnect-priority 10
+echo "dodano sieć $TEMP_SSID z priorytetem 10"
+
+TEMP_SSID="moje nie tylkaj"
+TEMP_PASSWORD="12345678"
+sudo nmcli dev wifi connect "$TEMP_SSID" password "$TEMP_PASSWORD"
+sudo nmcli connection modify "$TEMP_SSID" connection.autoconnect-priority 9
+echo "dodano sieć $TEMP_SSID z priorytetem 9"
+
+unset TEMP_PASSWORD
+
 echo "--- 6. Czyszczenie katalogu domowego i konfiguracja środowiska Mavlink ---"
 USER_HOME="/home/$USERNAME"
 
