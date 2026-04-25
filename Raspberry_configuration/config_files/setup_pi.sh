@@ -11,6 +11,8 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 # Pobranie samej nazwy folderu, do którego sklonowałeś repo (potrzebne do wykluczenia z usuwania)
 REPO_DIR_NAME=$(basename "$SCRIPT_DIR")
 
+
+
 echo "--- 1. Ustawianie nazwy hosta ---"
 if [ -f "$SCRIPT_DIR/hostname.txt" ]; then
     NEW_HOSTNAME=$(cat "$SCRIPT_DIR/hostname.txt" | tr -d '[:space:]')
@@ -22,20 +24,32 @@ else
     echo "Błąd: Brak pliku hostname.txt"
 fi
 
-echo "--- 2. Instalacja wymaganych pakietów ---"
+echo "--- 2. Konfiguracja parametrów startowych kernela ---"
+if [ -f "$SCRIPT_DIR/cmdline.txt" ]; then
+    cp "$SCRIPT_DIR/cmdline.txt" /boot/firmware/cmdline.txt
+    echo "Plik cmdline.txt nadpisany."
+fi
+
+echo "--- 3. Konfiguracja sprzętowa ---"
+if [ -f "$SCRIPT_DIR/config.txt" ]; then
+    cp "$SCRIPT_DIR/config.txt" /boot/firmware/config.txt
+    echo "Plik config.txt nadpisany."
+fi
+
+echo "--- 4. Instalacja wymaganych pakietów ---"
 if [ -f "$SCRIPT_DIR/manual_packages.txt" ]; then
     apt-get update
-    PACKAGES=$(tr '\n' ' ' < "$SCRIPT_DIR/manual_packages.txt")
+    PACKAGES=$(tr '\n' ' ' < "$SCRIPT_DIR/apt_packages.txt")
     # Dodano pakiety python3-venv i python3-pip niezbędne do utworzenia środowiska wirtualnego
-    apt-get install -y $PACKAGES python3-venv python3-pip
+    apt-get install -y $PACKAGES
     echo "Pakiety zainstalowane."
     sudo apt-get remove modemmanager -y
     echo "Odinstalowano modemanager"
 else
-    echo "Błąd: Brak pliku manual_packages.txt"
+    echo "Błąd: Brak pliku apt_packages.txt"
 fi
 
-echo "--- 3. Konfiguracja grup użytkownika ---"
+echo "--- 5. Konfiguracja grup użytkownika ---"
 if [ -f "$SCRIPT_DIR/user_groups.txt" ]; then
     USER_LINE=$(cat "$SCRIPT_DIR/user_groups.txt")
     USERNAME=$(echo "$USER_LINE" | awk -F' : ' '{print $1}' | tr -d ' ')
@@ -49,18 +63,6 @@ if [ -f "$SCRIPT_DIR/user_groups.txt" ]; then
     echo "Grupy zostały zaktualizowane."
 else
     echo "Błąd: Brak pliku user_groups.txt"
-fi
-
-echo "--- 4. Konfiguracja parametrów startowych kernela ---"
-if [ -f "$SCRIPT_DIR/cmdline.txt" ]; then
-    cp "$SCRIPT_DIR/cmdline.txt" /boot/firmware/cmdline.txt
-    echo "Plik cmdline.txt nadpisany."
-fi
-
-echo "--- 5. Konfiguracja sprzętowa ---"
-if [ -f "$SCRIPT_DIR/config.txt" ]; then
-    cp "$SCRIPT_DIR/config.txt" /boot/firmware/config.txt
-    echo "Plik config.txt nadpisany."
 fi
 
 echo "--- 6. Czyszczenie katalogu domowego i konfiguracja środowiska Mavlink ---"
