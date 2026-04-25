@@ -345,7 +345,7 @@ libcairomm-1.0-1v5:arm64
 libcamera-ipa:arm64
 libcamera-tools
 libcamera-v4l2:arm64
-libcamera0.6:arm64
+libcamera0.7:arm64
 libcanberra0:arm64
 libcap-ng0:arm64
 libcap2:arm64
@@ -1499,7 +1499,6 @@ rpd-x-extras
 rpi-chromium-mods
 rpi-cloud-init-mods
 rpi-connect
-rpi-connect-lite
 rpi-eeprom
 rpi-firefox-mods
 rpi-gui-nop
